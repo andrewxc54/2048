@@ -1,31 +1,126 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>My GitHub Website</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Catch the Ball Game</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background: #222;
+    color: #eee;
+  }
+  #gameCanvas {
+    background: #111;
+    display: block;
+    margin: 20px auto;
+    border: 2px solid #eee;
+  }
+  #score {
+    font-size: 24px;
+    margin-top: 10px;
+  }
+  #instructions {
+    margin-top: 10px;
+    font-size: 16px;
+    color: #aaa;
+  }
+</style>
 </head>
 <body>
-  <header>
-    <h1>Welcome to My Website</h1>
-    <p>This site is hosted with GitHub Pages!</p>
-  </header>
 
-  <main>
-    <section>
-      <h2>About Me</h2>
-      <p>Hi! I'm learning how to build websites using HTML, CSS, and GitHub Pages.</p>
-    </section>
+<h1>Catch the Ball!</h1>
+<canvas id="gameCanvas" width="400" height="300"></canvas>
+<div id="score">Score: 0</div>
+<div id="instructions">Move the paddle with your mouse. Catch the falling balls!</div>
 
-    <section>
-      <h2>Contact</h2>
-      <p>You can find me on <a href="https://github.com/your-username" target="_blank">GitHub</a>.</p>
-    </section>
-  </main>
+<script>
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
 
-  <footer>
-    <p>&copy; 2025 My Website</p>
-  </footer>
+  const paddle = {
+    width: 80,
+    height: 15,
+    x: canvas.width / 2 - 40,
+    y: canvas.height - 30,
+    speed: 0,
+  };
+
+  const ball = {
+    radius: 12,
+    x: Math.random() * (canvas.width - 24) + 12,
+    y: 0,
+    dy: 3 + Math.random() * 2,
+    caught: false,
+  };
+
+  let score = 0;
+
+  function drawPaddle() {
+    ctx.fillStyle = '#0f0';
+    ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+  }
+
+  function drawBall() {
+    ctx.beginPath();
+    ctx.fillStyle = '#f00';
+    ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.closePath();
+  }
+
+  function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function update() {
+    clearCanvas();
+
+    // Move ball down
+    ball.y += ball.dy;
+
+    // Check if ball is caught by paddle
+    if (
+      ball.y + ball.radius >= paddle.y &&
+      ball.x > paddle.x &&
+      ball.x < paddle.x + paddle.width
+    ) {
+      score++;
+      ball.caught = true;
+    }
+
+    // Reset ball if it falls past bottom or is caught
+    if (ball.y - ball.radius > canvas.height || ball.caught) {
+      ball.x = Math.random() * (canvas.width - 24) + 12;
+      ball.y = 0;
+      ball.dy = 3 + Math.random() * 2;
+      ball.caught = false;
+    }
+
+    drawPaddle();
+    drawBall();
+
+    document.getElementById('score').innerText = `Score: ${score}`;
+
+    requestAnimationFrame(update);
+  }
+
+  // Move paddle with mouse
+  canvas.addEventListener('mousemove', function (e) {
+    const rect = canvas.getBoundingClientRect();
+    let mouseX = e.clientX - rect.left;
+    paddle.x = mouseX - paddle.width / 2;
+
+    // Keep paddle inside canvas
+    if (paddle.x < 0) paddle.x = 0;
+    if (paddle.x + paddle.width > canvas.width)
+      paddle.x = canvas.width - paddle.width;
+  });
+
+  update();
+</script>
+
 </body>
 </html>
+
