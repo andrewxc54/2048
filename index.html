@@ -1,278 +1,274 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Platformer with Enemy AI</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #111; color: white; text-align: center; font-family: sans-serif; }
-    canvas { display: block; margin: 20px auto; background-color: #222; border: 2px solid #555; }
-    h1 { margin-top: 10px; }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Shooting Game with AI Bots</title>
+<style>
+  body {
+    margin: 0; background: #222; color: white; overflow: hidden;
+    font-family: monospace;
+    user-select: none;
+  }
+  canvas {
+    background: #111;
+    display: block;
+    margin: 0 auto;
+    border: 2px solid #555;
+  }
+  #ui {
+    position: absolute;
+    top: 5px; left: 5px;
+    font-size: 16px;
+  }
+</style>
 </head>
 <body>
-  <h1>🕹️ Platformer Game with Enemy AI</h1>
-  <p>Use Arrow Keys to Move and Jump. Collect all coins to progress! Avoid enemies!</p>
-  <p>Level: <span id="levelDisplay">1</span></p>
-  <p>💰 Score: <span id="score">0</span> / <span id="total">0</span></p>
-  <canvas id="gameCanvas" width="800" height="400"></canvas>
+<div id="ui">Health: <span id="health">100</span></div>
+<canvas id="game" width="800" height="600"></canvas>
 
-  <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const scoreDisplay = document.getElementById('score');
-    const totalDisplay = document.getElementById('total');
-    const levelDisplay = document.getElementById('levelDisplay');
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const healthDisplay = document.getElementById('health');
 
-    const gravity = 0.5;
-    const friction = 0.8;
+  const WIDTH = canvas.width;
+  const HEIGHT = canvas.height;
 
-    const player = {
-      x: 50,
-      y: 0,
-      width: 30,
-      height: 30,
-      velocityX: 0,
-      velocityY: 0,
-      speed: 4,
-      jumping: true,
-      color: "#00FF7F"
-    };
+  // Player properties
+  const player = {
+    x: WIDTH/2,
+    y: HEIGHT/2,
+    size: 20,
+    speed: 4,
+    color: 'lightblue',
+    health: 100,
+    cooldown: 0,
+  };
 
-    const keys = {};
+  // Bullets (both player and bots)
+  let bullets = [];
 
-    // Levels: Each has platforms, coins, and enemies
-    const levels = [
-      {
-        platforms: [
-          { x: 0, y: 380, width: 800, height: 20 },
-          { x: 150, y: 300, width: 120, height: 10 },
-          { x: 350, y: 250, width: 100, height: 10 },
-          { x: 550, y: 200, width: 100, height: 10 },
-          { x: 700, y: 150, width: 80, height: 10 }
-        ],
-        coins: [
-          { x: 180, y: 270, radius: 8, collected: false },
-          { x: 380, y: 220, radius: 8, collected: false },
-          { x: 580, y: 170, radius: 8, collected: false },
-          { x: 720, y: 120, radius: 8, collected: false }
-        ],
-        enemies: [
-          { x: 160, y: 270, width: 30, height: 20, velocityX: 2, rangeStart: 150, rangeEnd: 270, color: "red" }
-        ]
-      },
-      {
-        platforms: [
-          { x: 0, y: 380, width: 800, height: 20 },
-          { x: 100, y: 320, width: 150, height: 10 },
-          { x: 300, y: 270, width: 80, height: 10 },
-          { x: 450, y: 230, width: 120, height: 10 },
-          { x: 630, y: 180, width: 100, height: 10 },
-          { x: 750, y: 130, width: 40, height: 10 }
-        ],
-        coins: [
-          { x: 140, y: 290, radius: 8, collected: false },
-          { x: 340, y: 240, radius: 8, collected: false },
-          { x: 490, y: 200, radius: 8, collected: false },
-          { x: 670, y: 150, radius: 8, collected: false },
-          { x: 770, y: 100, radius: 8, collected: false }
-        ],
-        enemies: [
-          { x: 110, y: 300, width: 30, height: 20, velocityX: 2.5, rangeStart: 100, rangeEnd: 230, color: "red" },
-          { x: 460, y: 210, width: 30, height: 20, velocityX: 3, rangeStart: 450, rangeEnd: 570, color: "red" }
-        ]
-      },
-      {
-        platforms: [
-          { x: 0, y: 380, width: 800, height: 20 },
-          { x: 180, y: 340, width: 80, height: 10 },
-          { x: 300, y: 300, width: 100, height: 10 },
-          { x: 450, y: 260, width: 150, height: 10 },
-          { x: 650, y: 210, width: 100, height: 10 },
-          { x: 760, y: 160, width: 30, height: 10 }
-        ],
-        coins: [
-          { x: 210, y: 310, radius: 8, collected: false },
-          { x: 340, y: 270, radius: 8, collected: false },
-          { x: 520, y: 230, radius: 8, collected: false },
-          { x: 680, y: 180, radius: 8, collected: false },
-          { x: 780, y: 130, radius: 8, collected: false }
-        ],
-        enemies: [
-          { x: 190, y: 320, width: 30, height: 20, velocityX: 2, rangeStart: 180, rangeEnd: 250, color: "red" },
-          { x: 460, y: 240, width: 30, height: 20, velocityX: 3, rangeStart: 450, rangeEnd: 590, color: "red" }
-        ]
-      }
-    ];
+  // AI bots
+  const bots = [];
+  const BOT_COUNT = 5;
 
-    let currentLevel = 0;
-    let score = 0;
+  function randRange(min, max) {
+    return Math.random() * (max - min) + min;
+  }
 
-    function resetPlayer() {
-      player.x = 50;
-      player.y = 0;
-      player.velocityX = 0;
-      player.velocityY = 0;
-      player.jumping = true;
+  // Create bots
+  for(let i=0; i<BOT_COUNT; i++){
+    bots.push({
+      x: randRange(50, WIDTH-50),
+      y: randRange(50, HEIGHT-50),
+      size: 20,
+      speed: 2,
+      color: 'red',
+      health: 30,
+      direction: Math.random() * 2 * Math.PI,
+      cooldown: 0,
+    });
+  }
+
+  // Input tracking
+  const keys = {};
+  window.addEventListener('keydown', e => {
+    keys[e.key.toLowerCase()] = true;
+  });
+  window.addEventListener('keyup', e => {
+    keys[e.key.toLowerCase()] = false;
+  });
+
+  // Helper: distance between two points
+  function dist(x1,y1,x2,y2){
+    return Math.hypot(x2 - x1, y2 - y1);
+  }
+
+  // Shoot bullet function
+  function shootBullet(x, y, dx, dy, owner){
+    bullets.push({x, y, dx, dy, speed: 8, size: 5, owner});
+  }
+
+  // Game update function
+  function update(){
+    // Player movement
+    let dx = 0, dy = 0;
+    if(keys['w'] || keys['arrowup']) dy -= 1;
+    if(keys['s'] || keys['arrowdown']) dy += 1;
+    if(keys['a'] || keys['arrowleft']) dx -= 1;
+    if(keys['d'] || keys['arrowright']) dx += 1;
+
+    if(dx !== 0 || dy !== 0){
+      const length = Math.hypot(dx, dy);
+      dx /= length;
+      dy /= length;
+
+      player.x += dx * player.speed;
+      player.y += dy * player.speed;
+
+      // Keep inside bounds
+      player.x = Math.min(WIDTH - player.size/2, Math.max(player.size/2, player.x));
+      player.y = Math.min(HEIGHT - player.size/2, Math.max(player.size/2, player.y));
     }
 
-    function loadLevel(levelIndex) {
-      currentLevel = levelIndex;
-      const level = levels[levelIndex];
-      level.coins.forEach(c => c.collected = false);
-      score = 0;
-      scoreDisplay.textContent = score;
-      totalDisplay.textContent = level.coins.length;
-      levelDisplay.textContent = levelIndex + 1;
-      resetPlayer();
+    // Shooting: spacebar to shoot
+    if(keys[' ']){
+      if(player.cooldown <= 0){
+        // Shoot bullet upwards (or you could shoot in movement direction)
+        // I'll shoot towards mouse pointer for more fun
+        if(lastMousePos){
+          let angle = Math.atan2(lastMousePos.y - player.y, lastMousePos.x - player.x);
+          let dx = Math.cos(angle);
+          let dy = Math.sin(angle);
+          shootBullet(player.x + dx*player.size, player.y + dy*player.size, dx, dy, 'player');
+          player.cooldown = 15; // cooldown frames (~0.25s)
+        }
+      }
     }
+    if(player.cooldown > 0) player.cooldown--;
 
-    function checkCollision(a, b) {
-      return (
-        a.x < b.x + b.width &&
-        a.x + a.width > b.x &&
-        a.y < b.y + b.height &&
-        a.y + a.height > b.y
-      );
-    }
+    // Update bullets
+    bullets = bullets.filter(bullet => {
+      bullet.x += bullet.dx * bullet.speed;
+      bullet.y += bullet.dy * bullet.speed;
+      // Remove if off screen
+      return bullet.x > 0 && bullet.x < WIDTH && bullet.y > 0 && bullet.y < HEIGHT;
+    });
 
-    document.addEventListener("keydown", e => keys[e.code] = true);
-    document.addEventListener("keyup", e => keys[e.code] = false);
+    // Bots AI: simple behavior - random walk + shoot if close to player
+    bots.forEach(bot => {
+      if(bot.health <= 0) return;
 
-    function update() {
-      // Player controls
-      if (keys["ArrowLeft"]) {
-        player.velocityX = -player.speed;
-      } else if (keys["ArrowRight"]) {
-        player.velocityX = player.speed;
-      } else {
-        player.velocityX *= friction;
+      // Move bot in its current direction
+      bot.x += Math.cos(bot.direction) * bot.speed;
+      bot.y += Math.sin(bot.direction) * bot.speed;
+
+      // Bounce from edges
+      if(bot.x < bot.size/2 || bot.x > WIDTH - bot.size/2){
+        bot.direction = Math.PI - bot.direction;
+      }
+      if(bot.y < bot.size/2 || bot.y > HEIGHT - bot.size/2){
+        bot.direction = -bot.direction;
       }
 
-      if (keys["ArrowUp"] && !player.jumping) {
-        player.velocityY = -10;
-        player.jumping = true;
+      // Slight random turn
+      bot.direction += (Math.random() - 0.5) * 0.1;
+
+      // Shoot if player is close and cooldown ready
+      const distToPlayer = dist(bot.x, bot.y, player.x, player.y);
+      if(distToPlayer < 200 && bot.cooldown <= 0){
+        // Shoot towards player
+        let angle = Math.atan2(player.y - bot.y, player.x - bot.x);
+        let dx = Math.cos(angle);
+        let dy = Math.sin(angle);
+        shootBullet(bot.x + dx*bot.size, bot.y + dy*bot.size, dx, dy, 'bot');
+        bot.cooldown = 60; // slower shooting for bots
       }
+      if(bot.cooldown > 0) bot.cooldown--;
+    });
 
-      // Gravity
-      player.velocityY += gravity;
-
-      // Update player position
-      player.x += player.velocityX;
-      player.y += player.velocityY;
-
-      // Platform collisions
-      player.jumping = true;
-      levels[currentLevel].platforms.forEach(p => {
-        if (checkCollision(player, p)) {
-          if (player.velocityY >= 0) {
-            player.y = p.y - player.height;
-            player.velocityY = 0;
-            player.jumping = false;
+    // Bullet collisions
+    bullets.forEach((bullet, i) => {
+      if(bullet.owner === 'player'){
+        // Check bots hit
+        bots.forEach(bot => {
+          if(bot.health > 0 && dist(bullet.x, bullet.y, bot.x, bot.y) < bot.size/2 + bullet.size/2){
+            bot.health -= 10;
+            bullets.splice(i, 1);
           }
-        }
-      });
-
-      // Coin collection
-      levels[currentLevel].coins.forEach(c => {
-        if (!c.collected) {
-          const dx = player.x + player.width / 2 - c.x;
-          const dy = player.y + player.height / 2 - c.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < player.width / 2 + c.radius) {
-            c.collected = true;
-            score++;
-            scoreDisplay.textContent = score;
-          }
-        }
-      });
-
-      // Enemy movement and collision
-      levels[currentLevel].enemies.forEach(enemy => {
-        // Move enemy
-        enemy.x += enemy.velocityX;
-
-        // Reverse direction if out of patrol range
-        if (enemy.x < enemy.rangeStart || enemy.x + enemy.width > enemy.rangeEnd) {
-          enemy.velocityX *= -1;
-          // Clamp position to range
-          if (enemy.x < enemy.rangeStart) enemy.x = enemy.rangeStart;
-          if (enemy.x + enemy.width > enemy.rangeEnd) enemy.x = enemy.rangeEnd - enemy.width;
-        }
-
-        // Check collision with player
-        if (checkCollision(player, enemy)) {
-          alert("💥 You got caught by an enemy! Restarting level...");
-          loadLevel(currentLevel);
-        }
-      });
-
-      // Check if all coins collected
-      if (score === levels[currentLevel].coins.length) {
-        if (currentLevel + 1 < levels.length) {
-          alert("Level Complete! Moving to next level...");
-          loadLevel(currentLevel + 1);
-        } else {
-          alert("🎉 Congratulations! You completed all levels!");
-          loadLevel(0);
+        });
+      } else if(bullet.owner === 'bot'){
+        // Check player hit
+        if(dist(bullet.x, bullet.y, player.x, player.y) < player.size/2 + bullet.size/2){
+          player.health -= 10;
+          bullets.splice(i, 1);
         }
       }
+    });
 
-      // Fell off screen
-      if (player.y > canvas.height) {
-        alert("You fell! Restarting level...");
-        loadLevel(currentLevel);
-      }
+    // Update UI
+    healthDisplay.textContent = player.health;
 
-      // Boundaries
-      if (player.x < 0) player.x = 0;
-      if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Draw player
-      ctx.fillStyle = player.color;
-      ctx.fillRect(player.x, player.y, player.width, player.height);
-
-      // Draw platforms
-      ctx.fillStyle = "#666";
-      levels[currentLevel].platforms.forEach(p => {
-        ctx.fillRect(p.x, p.y, p.width, p.height);
+    // Check game over
+    if(player.health <= 0){
+      alert('Game Over! Reload page to play again.');
+      player.health = 100;
+      // reset bots
+      bots.forEach(bot => {
+        bot.health = 30;
+        bot.x = randRange(50, WIDTH-50);
+        bot.y = randRange(50, HEIGHT-50);
       });
-
-      // Draw coins
-      levels[currentLevel].coins.forEach(c => {
-        if (!c.collected) {
-          ctx.beginPath();
-          ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
-          ctx.fillStyle = "gold";
-          ctx.fill();
-          ctx.strokeStyle = "#FFD700";
-          ctx.stroke();
-          ctx.closePath();
-        }
-      });
-
-      // Draw enemies
-      levels[currentLevel].enemies.forEach(enemy => {
-        ctx.fillStyle = enemy.color;
-        ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
-      });
+      bullets = [];
+      player.x = WIDTH/2;
+      player.y = HEIGHT/2;
     }
+  }
 
-    function gameLoop() {
-      update();
-      draw();
-      requestAnimationFrame(gameLoop);
-    }
+  // Drawing function
+  function draw(){
+    ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
-    loadLevel(0);
-    gameLoop();
-  </script>
+    // Draw player
+    ctx.fillStyle = player.color;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.size/2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw bots
+    bots.forEach(bot => {
+      if(bot.health <= 0) return; // dead bots not shown
+      ctx.fillStyle = bot.color;
+      ctx.beginPath();
+      ctx.arc(bot.x, bot.y, bot.size/2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw health bar for bot
+      ctx.fillStyle = 'black';
+      ctx.fillRect(bot.x - bot.size/2, bot.y - bot.size, bot.size, 5);
+      ctx.fillStyle = 'lime';
+      ctx.fillRect(bot.x - bot.size/2, bot.y - bot.size, bot.size * (bot.health / 30), 5);
+    });
+
+    // Draw bullets
+    ctx.fillStyle = 'yellow';
+    bullets.forEach(bullet => {
+      ctx.beginPath();
+      ctx.arc(bullet.x, bullet.y, bullet.size/2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    // Draw player health bar top-left
+    ctx.fillStyle = 'black';
+    ctx.fillRect(10, HEIGHT - 30, 100, 20);
+    ctx.fillStyle = 'lime';
+    ctx.fillRect(10, HEIGHT - 30, player.health, 20);
+    ctx.strokeStyle = 'white';
+    ctx.strokeRect(10, HEIGHT - 30, 100, 20);
+  }
+
+  // Track mouse for aiming
+  let lastMousePos = null;
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    lastMousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  });
+
+  // Game loop
+  function loop(){
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  loop();
+})();
+</script>
 </body>
 </html>
+
 
 
 
