@@ -3,528 +3,414 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2048 Game</title>
-    <link href="https://fonts.googleapis.com/css2?family=Changa+One&display=swap" rel="stylesheet">
+    <title>Evade</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --tile-size: min(15vw, 100px);
-            --gap: min(1.5vw, 12px);
-            --board-bg: #bbada0;
-            --tile-2: #eee4da;
-            --tile-4: #ede0c8;
-            --tile-8: #f2b179;
-            --tile-16: #f59563;
-            --tile-32: #f67c5f;
-            --tile-64: #f65e3b;
-            --tile-128: #edcf72;
-            --tile-256: #edcc61;
-            --tile-512: #edc850;
-            --tile-1024: #edc53f;
-            --tile-2048: #edc22e;
-            --tile-other: #3c3a32;
-        }
-
         body {
-            font-family: 'Changa One', cursive;
-            background-color: #faf8ef;
-            color: #776e65;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 20px;
+            background-color: #f0f0f0;
+            font-family: 'Bangers', cursive;
+            color: #4a2323;
+            flex-direction: column;
             overflow: hidden;
         }
 
-        .container {
+        .game-container {
             text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            max-width: 500px;
-            width: 100%;
+            background-color: #333;
+            border-radius: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+            padding: 20px;
+            position: relative;
         }
 
         h1 {
-            font-size: 3.5rem;
-            margin: 0;
-            color: #776e65;
+            font-size: 3rem;
+            margin-bottom: 10px;
+            color: #ffde6b;
+            text-shadow: 2px 2px 4px #000000;
         }
 
-        .header {
+        canvas {
+            background-color: #556b2f;
+            border-radius: 10px;
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .info-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
             width: 100%;
-            margin-bottom: 20px;
-        }
-
-        .score-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: #bbada0;
-            color: white;
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            min-width: 90px;
-        }
-
-        .score-label {
-            font-size: 0.8rem;
+            margin-top: 10px;
+            font-size: 1.5rem;
             text-transform: uppercase;
         }
 
-        .score-value {
-            font-size: 1.5rem;
-        }
-
-        .game-board-container {
-            position: relative;
-            background-color: var(--board-bg);
-            border-radius: 6px;
-            padding: var(--gap);
-            width: calc(4 * var(--tile-size) + 5 * var(--gap));
-            height: calc(4 * var(--tile-size) + 5 * var(--gap));
-            display: grid;
-            grid-template-columns: repeat(4, var(--tile-size));
-            grid-template-rows: repeat(4, var(--tile-size));
-            gap: var(--gap);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
-        }
-
-        .tile-cell {
-            background-color: rgba(238, 228, 218, 0.35);
-            border-radius: 6px;
-        }
-
-        .tile-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-
-        .tile {
-            position: absolute;
-            width: var(--tile-size);
-            height: var(--tile-size);
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+        #score, #health {
             font-weight: bold;
-            font-size: 1.8rem;
-            transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
-        }
-
-        .tile[data-value="2"] { background-color: var(--tile-2); color: #776e65; }
-        .tile[data-value="4"] { background-color: var(--tile-4); color: #776e65; }
-        .tile[data-value="8"] { background-color: var(--tile-8); color: #f9f6f2; }
-        .tile[data-value="16"] { background-color: var(--tile-16); color: #f9f6f2; }
-        .tile[data-value="32"] { background-color: var(--tile-32); color: #f9f6f2; }
-        .tile[data-value="64"] { background-color: var(--tile-64); color: #f9f6f2; }
-        .tile[data-value="128"] { background-color: var(--tile-128); color: #f9f6f2; }
-        .tile[data-value="256"] { background-color: var(--tile-256); color: #f9f6f2; }
-        .tile[data-value="512"] { background-color: var(--tile-512); color: #f9f6f2; }
-        .tile[data-value="1024"] { background-color: var(--tile-1024); color: #f9f6f2; }
-        .tile[data-value="2048"] { background-color: var(--tile-2048); color: #f9f6f2; }
-        .tile:not([data-value="2"]):not([data-value="4"]):not([data-value="8"]):not([data-value="16"]):not([data-value="32"]):not([data-value="64"]):not([data-value="128"]):not([data-value="256"]):not([data-value="512"]):not([data-value="1024"]):not([data-value="2048"]) {
-            background-color: var(--tile-other);
-        }
-
-        .tile.new-tile {
-            animation: popIn 0.2s ease-out;
-        }
-
-        @keyframes popIn {
-            0% { transform: scale(0); }
-            100% { transform: scale(1); }
+            color: #fff;
+            background-color: #4a2323;
+            padding: 5px 15px;
+            border-radius: 10px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
         }
 
         .message-box {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(250, 248, 239, 0.5);
-            backdrop-filter: blur(2px);
-            display: flex;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            font-size: 2rem;
+            display: none;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
-            font-weight: bold;
-            color: #776e65;
-            z-index: 10;
-            transition: opacity 0.3s ease-in-out;
-            opacity: 0;
-            pointer-events: none;
+            z-index: 100;
+        }
+        
+        .message-box h2 {
+            margin: 0;
+            font-size: 3rem;
         }
 
-        .message-box.visible {
-            opacity: 1;
-            pointer-events: auto;
+        .message-box p {
+            margin: 10px 0 20px;
+            font-size: 1.5rem;
         }
 
-        .message-text {
-            margin-bottom: 20px;
-        }
-
-        .controls {
-            margin-top: 20px;
-        }
-
-        .reset-button {
+        .btn {
             padding: 10px 20px;
-            background-color: #8f7a66;
-            color: white;
-            border: none;
-            border-radius: 6px;
+            font-size: 1.5rem;
             cursor: pointer;
-            font-size: 1rem;
-            font-weight: bold;
-            transition: background-color 0.2s ease-in-out;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.08);
+            border: none;
+            border-radius: 10px;
+            background-color: #ffde6b;
+            color: #4a2323;
+            font-family: 'Bangers', cursive;
+            text-transform: uppercase;
+            box-shadow: 0 5px 0 #ccb056;
+            transition: all 0.1s ease;
         }
 
-        .reset-button:hover {
-            background-color: #9f8b78;
+        .btn:active {
+            box-shadow: 0 2px 0 #ccb056;
+            transform: translateY(3px);
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 2.5rem;
+            }
+            .info-bar {
+                font-size: 1.2rem;
+            }
+            .message-box {
+                padding: 20px;
+            }
+            .message-box h2 {
+                font-size: 2.5rem;
+            }
+            .btn {
+                font-size: 1.2rem;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>2048</h1>
-            <div class="score-container">
-                <span class="score-label">Score</span>
-                <span class="score-value" id="score">0</span>
-            </div>
+    <div class="game-container">
+        <h1>EVADE</h1>
+        <canvas id="gameCanvas"></canvas>
+        <div class="info-bar">
+            <span>Score: <span id="score">0</span></span>
+            <span>Health: <span id="health">100</span></span>
         </div>
-        
-        <div class="game-board-container" id="game-board">
-            <!-- Grid cells and tiles will be generated here by JavaScript -->
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-cell"></div>
-            <div class="tile-container" id="tile-container"></div>
-        </div>
+    </div>
 
-        <div class="controls">
-            <button class="reset-button" id="reset-button">New Game</button>
-        </div>
-
-        <div class="message-box" id="message-box">
-            <div class="message-text" id="message-text"></div>
-            <button class="reset-button" id="play-again-button">Play Again</button>
-        </div>
+    <div id="messageBox" class="message-box">
+        <h2 id="messageTitle"></h2>
+        <p id="messageText"></p>
+        <button id="playAgainBtn" class="btn">Play Again</button>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            const gameBoard = document.getElementById('game-board');
-            const tileContainer = document.getElementById('tile-container');
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
             const scoreDisplay = document.getElementById('score');
-            const resetButton = document.getElementById('reset-button');
-            const messageBox = document.getElementById('message-box');
-            const messageText = document.getElementById('message-text');
-            const playAgainButton = document.getElementById('play-again-button');
-            
-            let board = [];
+            const healthDisplay = document.getElementById('health');
+            const messageBox = document.getElementById('messageBox');
+            const messageTitle = document.getElementById('messageTitle');
+            const messageText = document.getElementById('messageText');
+            const playAgainBtn = document.getElementById('playAgainBtn');
+
+            let gameInterval;
+            let player;
+            let enemies = [];
+            let projectiles = [];
             let score = 0;
-            const size = 4;
+            let health = 100;
             let isGameOver = false;
+            let enemySpawnRate = 1000;
+            let lastEnemySpawn = 0;
+            
+            // Player movement keys
+            const keys = {
+                up: false,
+                down: false,
+                left: false,
+                right: false
+            };
 
-            let touchStartX = 0;
-            let touchStartY = 0;
+            const canvasSize = Math.min(window.innerWidth, window.innerHeight, 500);
+            canvas.width = canvasSize;
+            canvas.height = canvasSize;
+            
+            // Resize canvas on window resize
+            window.addEventListener('resize', () => {
+                const newSize = Math.min(window.innerWidth, window.innerHeight, 500);
+                canvas.width = newSize;
+                canvas.height = newSize;
+            });
 
-            // Initialize the game
-            function initializeGame() {
-                board = Array(size).fill(0).map(() => Array(size).fill(0));
+            class Character {
+                constructor(x, y, radius, color) {
+                    this.x = x;
+                    this.y = y;
+                    this.radius = radius;
+                    this.color = color;
+                    this.speed = 2;
+                }
+
+                draw() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                    ctx.closePath();
+                }
+            }
+
+            class Player extends Character {
+                constructor(x, y, radius, color) {
+                    super(x, y, radius, color);
+                    this.health = 100;
+                }
+
+                update() {
+                    if (keys.up) this.y -= this.speed;
+                    if (keys.down) this.y += this.speed;
+                    if (keys.left) this.x -= this.speed;
+                    if (keys.right) this.x += this.speed;
+
+                    // Keep player within canvas boundaries
+                    if (this.x - this.radius < 0) this.x = this.radius;
+                    if (this.x + this.radius > canvas.width) this.x = canvas.width - this.radius;
+                    if (this.y - this.radius < 0) this.y = this.radius;
+                    if (this.y + this.radius > canvas.height) this.y = canvas.height - this.radius;
+                }
+
+                takeDamage() {
+                    this.health -= 10;
+                    healthDisplay.textContent = this.health;
+                    if (this.health <= 0) {
+                        isGameOver = true;
+                        endGame('Game Over', `Your score: ${score}`);
+                    }
+                }
+            }
+
+            class Projectile extends Character {
+                constructor(x, y, radius, color, velocity) {
+                    super(x, y, radius, color);
+                    this.velocity = velocity;
+                }
+
+                update() {
+                    this.x += this.velocity.x;
+                    this.y += this.velocity.y;
+                }
+            }
+
+            class Enemy extends Character {
+                constructor(x, y, radius, color) {
+                    super(x, y, radius, color);
+                }
+
+                update() {
+                    const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                    this.x += Math.cos(angle) * this.speed;
+                    this.y += Math.sin(angle) * this.speed;
+                }
+            }
+
+            function startGame() {
+                player = new Player(canvas.width / 2, canvas.height / 2, 15, '#ffde6b');
+                enemies = [];
+                projectiles = [];
                 score = 0;
+                health = 100;
                 isGameOver = false;
+                lastEnemySpawn = Date.now();
                 scoreDisplay.textContent = score;
-                messageBox.classList.remove('visible');
-                addRandomTile();
-                addRandomTile();
-                renderBoard();
+                healthDisplay.textContent = health;
+                messageBox.style.display = 'none';
+
+                if (gameInterval) clearInterval(gameInterval);
+                gameInterval = setInterval(gameLoop, 1000 / 60); // 60 FPS
             }
 
-            // Add a new tile (2 or 4) to a random empty spot
-            function addRandomTile() {
-                if (isFull()) return;
-                
-                let emptyCells = [];
-                for (let r = 0; r < size; r++) {
-                    for (let c = 0; c < size; c++) {
-                        if (board[r][c] === 0) {
-                            emptyCells.push({ r, c });
-                        }
+            function endGame(title, text) {
+                isGameOver = true;
+                clearInterval(gameInterval);
+                messageTitle.textContent = title;
+                messageText.textContent = text;
+                messageBox.style.display = 'flex';
+            }
+
+            function spawnEnemy() {
+                if (Date.now() - lastEnemySpawn > enemySpawnRate) {
+                    let x, y;
+                    const side = Math.floor(Math.random() * 4);
+                    switch(side) {
+                        case 0: // Top
+                            x = Math.random() * canvas.width;
+                            y = -30;
+                            break;
+                        case 1: // Right
+                            x = canvas.width + 30;
+                            y = Math.random() * canvas.height;
+                            break;
+                        case 2: // Bottom
+                            x = Math.random() * canvas.width;
+                            y = canvas.height + 30;
+                            break;
+                        case 3: // Left
+                            x = -30;
+                            y = Math.random() * canvas.height;
+                            break;
                     }
-                }
-
-                if (emptyCells.length > 0) {
-                    const randomCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-                    board[randomCell.r][randomCell.c] = Math.random() < 0.9 ? 2 : 4;
+                    enemies.push(new Enemy(x, y, 10, '#f65e3b'));
+                    lastEnemySpawn = Date.now();
+                    // Increase difficulty over time
+                    if (enemySpawnRate > 200) enemySpawnRate -= 5;
                 }
             }
-
-            // Render the board to the DOM
-            function renderBoard() {
-                tileContainer.innerHTML = '';
-                for (let r = 0; r < size; r++) {
-                    for (let c = 0; c < size; c++) {
-                        if (board[r][c] !== 0) {
-                            const tile = document.createElement('div');
-                            tile.classList.add('tile');
-                            tile.setAttribute('data-value', board[r][c]);
-                            tile.textContent = board[r][c];
-                            tile.style.transform = `translate(
-                                calc(${c} * (var(--tile-size) + var(--gap)) + var(--gap)),
-                                calc(${r} * (var(--tile-size) + var(--gap)) + var(--gap))
-                            )`;
-                            
-                            // Check for new tiles and add pop-in animation
-                            const isNewTile = board[r][c] !== 0 && !document.querySelector(`.tile[data-value="${board[r][c]}"]`);
-                            if (isNewTile) {
-                                tile.classList.add('new-tile');
-                            }
-                            
-                            tileContainer.appendChild(tile);
-                        }
-                    }
-                }
-                scoreDisplay.textContent = score;
-            }
-
-            // Check if the board is full
-            function isFull() {
-                for (let r = 0; r < size; r++) {
-                    for (let c = 0; c < size; c++) {
-                        if (board[r][c] === 0) {
-                            return false;
-                        }
-                    }
-                }
-                return true;
-            }
-
-            // Check if there are any possible moves left
-            function hasPossibleMoves() {
-                // Check for empty cells
-                if (!isFull()) return true;
-
-                // Check for adjacent same-value tiles
-                for (let r = 0; r < size; r++) {
-                    for (let c = 0; c < size; c++) {
-                        const tileValue = board[r][c];
-                        if (r < size - 1 && board[r + 1][c] === tileValue) return true;
-                        if (c < size - 1 && board[r][c + 1] === tileValue) return true;
-                    }
-                }
-                return false;
-            }
-
-            // Slide all tiles in a single row or column
-            function slide(rowOrCol) {
-                // Remove zeros
-                const nonZero = rowOrCol.filter(tile => tile !== 0);
-                // Add zeros back to the end
-                const newRowOrCol = nonZero.concat(Array(size - nonZero.length).fill(0));
-                return newRowOrCol;
-            }
-
-            // Combine adjacent tiles of the same value
-            function combine(rowOrCol) {
-                for (let i = 0; i < size - 1; i++) {
-                    if (rowOrCol[i] !== 0 && rowOrCol[i] === rowOrCol[i + 1]) {
-                        rowOrCol[i] *= 2;
-                        score += rowOrCol[i];
-                        rowOrCol[i + 1] = 0;
-                    }
-                }
-                return rowOrCol;
-            }
-
-            // Move the tiles
-            function move(direction) {
+            
+            function gameLoop() {
                 if (isGameOver) return;
                 
-                let boardChanged = false;
-                const prevBoard = JSON.parse(JSON.stringify(board));
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                switch (direction) {
-                    case 'up':
-                    case 'down':
-                        // Transpose the board to treat columns as rows
-                        let transposed = Array(size).fill(0).map(() => Array(size).fill(0));
-                        for (let r = 0; r < size; r++) {
-                            for (let c = 0; c < size; c++) {
-                                transposed[c][r] = board[r][c];
-                            }
-                        }
+                spawnEnemy();
 
-                        for (let c = 0; c < size; c++) {
-                            let col = transposed[c];
-                            if (direction === 'up') {
-                                col = slide(col);
-                                col = combine(col);
-                                col = slide(col);
-                            } else { // 'down'
-                                col.reverse();
-                                col = slide(col);
-                                col = combine(col);
-                                col = slide(col);
-                                col.reverse();
-                            }
-                            transposed[c] = col;
-                        }
+                player.update();
+                player.draw();
 
-                        // Transpose back
-                        for (let r = 0; r < size; r++) {
-                            for (let c = 0; c < size; c++) {
-                                board[r][c] = transposed[c][r];
-                            }
-                        }
-                        break;
-                    
-                    case 'left':
-                    case 'right':
-                        for (let r = 0; r < size; r++) {
-                            let row = board[r];
-                            if (direction === 'left') {
-                                row = slide(row);
-                                row = combine(row);
-                                row = slide(row);
-                            } else { // 'right'
-                                row.reverse();
-                                row = slide(row);
-                                row = combine(row);
-                                row = slide(row);
-                                row.reverse();
-                            }
-                            board[r] = row;
-                        }
-                        break;
-                }
-
-                // Check if the board has changed
-                boardChanged = JSON.stringify(board) !== JSON.stringify(prevBoard);
-
-                if (boardChanged) {
-                    addRandomTile();
-                    renderBoard();
-                    checkGameState();
-                }
-            }
-
-            // Check for win/lose conditions
-            function checkGameState() {
-                for (let r = 0; r < size; r++) {
-                    for (let c = 0; c < size; c++) {
-                        if (board[r][c] === 2048) {
-                            showEndMessage('win');
-                            isGameOver = true;
-                            return;
-                        }
+                // Update and draw projectiles
+                projectiles.forEach((p, index) => {
+                    p.update();
+                    p.draw();
+                    if (p.x < -p.radius || p.x > canvas.width + p.radius || p.y < -p.radius || p.y > canvas.height + p.radius) {
+                        projectiles.splice(index, 1);
                     }
-                }
+                });
 
-                if (isFull() && !hasPossibleMoves()) {
-                    showEndMessage('lose');
-                    isGameOver = true;
-                }
+                // Update and draw enemies
+                enemies.forEach((e, enemyIndex) => {
+                    e.update();
+                    e.draw();
+
+                    // Collision with player
+                    const dist = Math.hypot(e.x - player.x, e.y - player.y);
+                    if (dist - e.radius - player.radius < 1) {
+                        player.takeDamage();
+                        enemies.splice(enemyIndex, 1);
+                    }
+
+                    // Collision with projectiles
+                    projectiles.forEach((p, pIndex) => {
+                        const hitDist = Math.hypot(e.x - p.x, e.y - p.y);
+                        if (hitDist - e.radius - p.radius < 1) {
+                            enemies.splice(enemyIndex, 1);
+                            projectiles.splice(pIndex, 1);
+                            score += 10;
+                            scoreDisplay.textContent = score;
+                        }
+                    });
+                });
             }
 
-            // Display win or lose message
-            function showEndMessage(status) {
-                if (status === 'win') {
-                    messageText.textContent = 'You Win!';
-                } else if (status === 'lose') {
-                    messageText.textContent = 'Game Over!';
-                }
-                messageBox.classList.add('visible');
-            }
-
-            // Event listeners for keyboard input
-            document.addEventListener('keydown', (event) => {
+            // Keyboard controls
+            window.addEventListener('keydown', (e) => {
                 if (isGameOver) return;
-                switch (event.key) {
-                    case 'ArrowUp':
-                        move('up');
-                        break;
-                    case 'ArrowDown':
-                        move('down');
-                        break;
-                    case 'ArrowLeft':
-                        move('left');
-                        break;
-                    case 'ArrowRight':
-                        move('right');
-                        break;
+                switch(e.key) {
+                    case 'w': keys.up = true; break;
+                    case 's': keys.down = true; break;
+                    case 'a': keys.left = true; break;
+                    case 'd': keys.right = true; break;
+                    case ' ': shoot(); break;
                 }
             });
 
-            // Event listeners for touch gestures
-            gameBoard.addEventListener('touchstart', (event) => {
-                touchStartX = event.touches[0].clientX;
-                touchStartY = event.touches[0].clientY;
+            window.addEventListener('keyup', (e) => {
+                switch(e.key) {
+                    case 'w': keys.up = false; break;
+                    case 's': keys.down = false; break;
+                    case 'a': keys.left = false; break;
+                    case 'd': keys.right = false; break;
+                }
             });
 
-            gameBoard.addEventListener('touchend', (event) => {
+            // Mouse/Touch shooting
+            canvas.addEventListener('mousedown', (e) => {
                 if (isGameOver) return;
-                const touchEndX = event.changedTouches[0].clientX;
-                const touchEndY = event.changedTouches[0].clientY;
-                const dx = touchEndX - touchStartX;
-                const dy = touchEndY - touchStartY;
-
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    // Horizontal swipe
-                    if (dx > 0) {
-                        move('right');
-                    } else {
-                        move('left');
-                    }
-                } else {
-                    // Vertical swipe
-                    if (dy > 0) {
-                        move('down');
-                    } else {
-                        move('up');
-                    }
-                }
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                shoot(mouseX, mouseY);
+            });
+            
+            canvas.addEventListener('touchstart', (e) => {
+                if (isGameOver) return;
+                e.preventDefault();
+                const rect = canvas.getBoundingClientRect();
+                const touchX = e.touches[0].clientX - rect.left;
+                const touchY = e.touches[0].clientY - rect.top;
+                shoot(touchX, touchY);
             });
 
-            // Button listeners
-            resetButton.addEventListener('click', initializeGame);
-            playAgainButton.addEventListener('click', initializeGame);
+            function shoot(targetX, targetY) {
+                if (!player) return; // Guard against shooting before player exists
+                const angle = Math.atan2(targetY - player.y, targetX - player.x);
+                const velocity = {
+                    x: Math.cos(angle) * 5,
+                    y: Math.sin(angle) * 5
+                };
+                projectiles.push(new Projectile(player.x, player.y, 5, '#ffde6b', velocity));
+            }
+
+            // Button listener
+            playAgainBtn.addEventListener('click', startGame);
 
             // Start the game for the first time
-            initializeGame();
+            startGame();
         });
     </script>
 </body>
 </html>
+
 
 
 
