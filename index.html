@@ -3,92 +3,76 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Top-down Shooting Game — Single File</title>
+<title>Top-down Shooting Game</title>
 <style>
-*{box-sizing:border-box}html,body{height:100%;margin:0;font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial;background:#0f1113;color:#eee}
-#ui{padding:12px;background:linear-gradient(90deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))}
-#game{display:block;margin:12px auto;background:#111;border:4px solid #222;box-shadow:0 8px 30px rgba(0,0,0,0.7);max-width:100%;height:auto}
-#status,#info{margin-top:6px;font-size:14px}
-.overlay{position:fixed;left:12px;bottom:12px;background:rgba(0,0,0,0.4);padding:10px;border-radius:8px}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: #0b0f1a; color: #f2f2f2; text-align: center; }
+#ui { padding: 12px; background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)); }
+#game { display: block; margin: 12px auto; background: #1a2238; border: 4px solid #2d3a5c; box-shadow: 0 8px 30px rgba(0,0,0,0.7); }
+#status, #info { margin-top: 6px; font-size: 14px; }
+#retryBtn { display: none; margin: 10px auto; padding: 10px 20px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; background: #e63946; color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s; }
+#retryBtn:hover { background: #d62828; }
 </style>
 </head>
 <body>
 <div id="ui">
-<h1>Top-down Shooting Game (single-file)</h1>
+<h1>Top-down Shooting Game</h1>
 <div id="info">Move: WASD • Shoot: Click/Space • Weapon: 1/2/3 • Map: M</div>
 <div id="status">HP: <span id="hp">100</span> • Weapon: <span id="wlevel">1</span> • Map: <span id="map">1</span></div>
+<button id="retryBtn">Retry</button>
 </div>
 <canvas id="game" width="960" height="640"></canvas>
-<div class="overlay">Tip: open this file directly in a browser — nothing to install.</div>
 
 <script>
-// Entire game in this script — no external files
-(function(){
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
-const W = canvas.width, H = canvas.height;
 const hpEl = document.getElementById('hp');
 const wlevelEl = document.getElementById('wlevel');
 const mapEl = document.getElementById('map');
-const keys = {};
-let mouse = { x: W/2, y: H/2, down: false };
+const retryBtn = document.getElementById('retryBtn');
+
+const W = canvas.width, H = canvas.height;
+const keys = {}; let mouse = { x: W/2, y: H/2, down: false };
+
 const player = { x: W/2, y: H/2, r: 14, speed: 240, hp: 100, fireCooldown: 0, fireRate: 0.18, wlevel: 1 };
-const bullets = [], enemyBullets = [];
-let enemies = [];
+const bullets = [], enemyBullets = []; let enemies = [];
+
 const maps = [
-{ name: 'Arena', spawns: [ [80,80],[880,80],[80,560],[880,560],[480,80] ], bg:'#101018' },
-{ name: 'Center Maze', spawns: [ [240,160],[720,160],[240,480],[720,480],[480,320] ], bg:'#081018' }
+{ name: 'Arena', bg: '#0b132b', spawns: [[80,80],[880,80],[80,560],[880,560],[480,80]] },
+{ name: 'Center Maze', bg: '#1c2541', spawns: [[240,160],[720,160],[240,480],[720,480],[480,320]] }
 ];
 let mapIndex = 0;
-let last = performance.now();
-function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
-function reset(){
+
+let last = performance.now(); let gameOver = false;
+
+function spawnEnemies() {
+enemies = [];
+const sp = maps[mapIndex].spawns;
+for (let [x,y] of sp) enemies.push({ x, y, r: 16, hp: 20, speed: 60, shootTimer: Math.random()*2, shootRate: 1.2 });
+}
+
+function reset() {
 player.x = W/2; player.y = H/2; player.hp = 100; player.wlevel = 1; player.fireCooldown = 0;
-bullets.length = 0; enemyBullets.length = 0; mapIndex = 0; mapEl.textContent = mapIndex+1; wlevelEl.textContent = player.wlevel; hpEl.textContent = player.hp; spawnEnemies();
-}
-function spawnEnemies(){ enemies = []; const sp = maps[mapIndex].spawns; for(let i=0;i<sp.length;i++){ const [x,y]=sp[i]; enemies.push({ x, y, r: 18, hp: 8 + Math.floor(Math.random()*12), speed: 50 + Math.random()*40, shootTimer: Math.random()*2, shootRate: 1.4, type: 'shooter' }); } }
-
-window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()] = true; if(e.key==='1'||e.key==='2'||e.key==='3'){ player.wlevel = Number(e.key); wlevelEl.textContent = player.wlevel; } if(e.key.toLowerCase()==='m'){ mapIndex = (mapIndex+1) % maps.length; mapEl.textContent = mapIndex+1; spawnEnemies(); } if(e.key.toLowerCase()==='r'){ reset(); } if(e.code==='Space'){ mouse.down = true; } });
-window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()] = false; if(e.code==='Space') mouse.down = false; });
-canvas.addEventListener('mousemove', e=>{ const rect = canvas.getBoundingClientRect(); mouse.x = (e.clientX-rect.left) * (canvas.width/rect.width); mouse.y = (e.clientY-rect.top) * (canvas.height/rect.height); });
-canvas.addEventListener('mousedown', e=>{ mouse.down = true; }); window.addEventListener('mouseup', e=>{ mouse.down = false; });
-
-function playerShoot(){ if(player.fireCooldown>0) return; const angle = Math.atan2(mouse.y-player.y, mouse.x-player.x); const speed=420; if(player.wlevel===1){ bullets.push({ x: player.x + Math.cos(angle)*player.r, y: player.y + Math.sin(angle)*player.r, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, dmg: 5 }); } else if(player.wlevel===2){ for(let a of [angle-0.2, angle, angle+0.2]) bullets.push({ x: player.x + Math.cos(a)*player.r, y: player.y + Math.sin(a)*player.r, vx: Math.cos(a)*speed, vy: Math.sin(a)*speed, dmg: 4 }); } else { bullets.push({ x: player.x + Math.cos(angle)*player.r, y: player.y + Math.sin(angle)*player.r, vx: Math.cos(angle)*(speed*1.4), vy: Math.sin(angle)*(speed*1.4), dmg: 9 }); } player.fireCooldown = player.fireRate; }
-function enemyShoot(e){ const angle = Math.atan2(player.y-e.y, player.x-e.x); const s=200; enemyBullets.push({ x: e.x + Math.cos(angle)*e.r, y: e.y + Math.sin(angle)*e.r, vx: Math.cos(angle)*s, vy: Math.sin(angle)*s, dmg: 7 }); }
-
-function update(dt){ // player movement
-let vx=0, vy=0; if(keys['w']||keys['arrowup']) vy-=1; if(keys['s']||keys['arrowdown']) vy+=1; if(keys['a']||keys['arrowleft']) vx-=1; if(keys['d']||keys['arrowright']) vx+=1; const len = Math.hypot(vx,vy); if(len>0){ vx = (vx/len)*player.speed*dt; vy = (vy/len)*player.speed*dt; player.x = clamp(player.x + vx, player.r, W-player.r); player.y = clamp(player.y + vy, player.r, H-player.r); }
-// shooting
-player.fireCooldown = Math.max(0, player.fireCooldown - dt);
-if(mouse.down) playerShoot();
-// update bullets
-for(let i=bullets.length-1;i>=0;i--){ const b=bullets[i]; b.x += b.vx*dt; b.y += b.vy*dt; if(b.x< -50||b.x>W+50||b.y<-50||b.y>H+50) bullets.splice(i,1); else { for(let j=enemies.length-1;j>=0;j--){ const e=enemies[j]; const dx=b.x-e.x, dy=b.y-e.y; if(dx*dx+dy*dy <= (e.r+4)*(e.r+4)){ e.hp -= b.dmg; bullets.splice(i,1); if(e.hp<=0){ enemies.splice(j,1); } break; } } } }
-// enemies behavior
-for(let i=enemies.length-1;i>=0;i--){ const e=enemies[i]; const dx=player.x-e.x, dy=player.y-e.y; const dist=Math.hypot(dx,dy); if(dist>60){ e.x += (dx/dist)*e.speed*dt; e.y += (dy/dist)*e.speed*dt; } e.shootTimer -= dt; if(e.shootTimer <= 0){ enemyShoot(e); e.shootTimer = e.shootRate * (0.8 + Math.random()*0.9); } }
-// enemy bullets
-for(let i=enemyBullets.length-1;i>=0;i--){ const b=enemyBullets[i]; b.x += b.vx*dt; b.y += b.vy*dt; const dx=b.x-player.x, dy=b.y-player.y; if(dx*dx+dy*dy <= (player.r+4)*(player.r+4)){ player.hp -= b.dmg; enemyBullets.splice(i,1); if(player.hp<=0){ player.hp = 0; mouse.down = false; } } else if(b.x< -50||b.x>W+50||b.y<-50||b.y>H+50) enemyBullets.splice(i,1); }
-hpEl.textContent = Math.max(0, Math.round(player.hp));
-if(enemies.length===0){ mapIndex = (mapIndex+1) % maps.length; mapEl.textContent = mapIndex+1; spawnEnemies(); for(let e of enemies){ e.hp = Math.round(e.hp*1.2); e.speed *= 1.05; } }
+bullets.length = 0; enemyBullets.length = 0;
+mapIndex = 0; mapEl.textContent = mapIndex+1; wlevelEl.textContent = player.wlevel; hpEl.textContent = player.hp;
+gameOver = false; retryBtn.style.display = 'none';
+spawnEnemies();
 }
 
-function draw(){ ctx.fillStyle = '#0b0c10'; ctx.fillRect(0,0,W,H);
-ctx.save(); ctx.translate(player.x, player.y);
-ctx.beginPath(); ctx.fillStyle = '#54a0ff'; ctx.arc(0,0,player.r,0,Math.PI*2); ctx.fill(); ctx.closePath();
-const ang = Math.atan2(mouse.y-player.y, mouse.x-player.x);
-ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(ang)*player.r*1.6, Math.sin(ang)*player.r*1.6); ctx.stroke(); ctx.closePath();
-ctx.restore();
-for(const b of bullets){ ctx.beginPath(); ctx.fillStyle = '#ffd166'; ctx.arc(b.x,b.y,4,0,Math.PI*2); ctx.fill(); }
-for(const b of enemyBullets){ ctx.beginPath(); ctx.fillStyle = '#ff6b6b'; ctx.arc(b.x,b.y,5,0,Math.PI*2); ctx.fill(); }
-for(const e of enemies){ ctx.beginPath(); ctx.fillStyle = '#9b5de5'; ctx.arc(e.x,e.y,e.r,0,Math.PI*2); ctx.fill(); const barW = 36; const percent = clamp(e.hp / (10+10), 0, 1); ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(e.x - barW/2, e.y - e.r - 12, barW, 6); ctx.fillStyle = '#00c853'; ctx.fillRect(e.x - barW/2 + 1, e.y - e.r - 11, (barW-2)*percent, 4); ctx.fillStyle = '#fff'; ctx.font = '12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(e.hp, e.x, e.y - e.r - 18); }
-ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(6,6,220,36);
-ctx.fillStyle = '#fff'; ctx.font='14px sans-serif'; ctx.textAlign='left'; ctx.fillText('HP: '+Math.max(0,Math.round(player.hp))+' Weapon: '+player.wlevel+' Enemies: '+enemies.length, 12, 30);
+function playerShoot() {
+if (player.fireCooldown > 0) return;
+const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
+const speed = 420;
+if (player.wlevel === 1) bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, dmg: 5 });
+else if (player.wlevel === 2) for (let a of [angle-0.18, angle, angle+0.18]) bullets.push({ x: player.x, y: player.y, vx: Math.cos(a)*speed, vy: Math.sin(a)*speed, dmg: 4 });
+else bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle)*speed*1.4, vy: Math.sin(angle)*speed*1.4, dmg: 9 });
+player.fireCooldown = player.fireRate;
 }
 
-function loop(t){ const dt = Math.min(0.05, (t-last)/1000); last = t; if(player.hp>0) update(dt); draw(); requestAnimationFrame(loop); }
-reset(); requestAnimationFrame(loop);
-})();
-</script>
-</body>
+function enemyShoot(e) {
+const angle = Math.atan2(player.y - e.y, player.x - e.x);
+enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(angle)*200, vy: Math.sin(angle)*200, dmg: 7 });
+}
 </html>
 
 
