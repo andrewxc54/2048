@@ -3,44 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evade</title>
-    <link href="https://fonts.googleapis.com/css2?family=Bangers&display=swap" rel="stylesheet">
+    <title>Paddle Clash</title>
     <style>
         body {
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            background-color: #f0f0f0;
-            font-family: 'Bangers', cursive;
-            color: #4a2323;
-            flex-direction: column;
-            overflow: hidden;
+            background-color: #1a1a1a;
+            font-family: 'Arial', sans-serif;
+            color: #fff;
+            text-align: center;
         }
 
         .game-container {
-            text-align: center;
-            background-color: #333;
-            border-radius: 20px;
+            background-color: #2b2b2b;
+            border-radius: 10px;
             box-shadow: 0 10px 20px rgba(0,0,0,0.5);
             padding: 20px;
             position: relative;
         }
 
         h1 {
-            font-size: 3rem;
+            font-size: 2.5rem;
             margin-bottom: 10px;
             color: #ffde6b;
-            text-shadow: 2px 2px 4px #000000;
         }
 
         canvas {
-            background-color: #556b2f;
-            border-radius: 10px;
+            background-color: #000;
+            border-radius: 5px;
             display: block;
-            width: 100%;
-            height: 100%;
+            border: 2px solid #555;
         }
 
         .info-bar {
@@ -49,17 +45,18 @@
             align-items: center;
             width: 100%;
             margin-top: 10px;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             text-transform: uppercase;
         }
 
-        #score, #health {
+        #playerScore, #aiScore {
             font-weight: bold;
             color: #fff;
-            background-color: #4a2323;
-            padding: 5px 15px;
-            border-radius: 10px;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+        }
+        
+        #paddleType {
+            color: #ffde6b;
+            font-weight: bold;
         }
 
         .message-box {
@@ -67,12 +64,11 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.8);
             color: white;
             padding: 40px;
             border-radius: 15px;
             text-align: center;
-            font-size: 2rem;
             display: none;
             flex-direction: column;
             align-items: center;
@@ -82,23 +78,23 @@
         
         .message-box h2 {
             margin: 0;
-            font-size: 3rem;
+            font-size: 2.5rem;
         }
 
         .message-box p {
             margin: 10px 0 20px;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
         }
 
         .btn {
             padding: 10px 20px;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
             cursor: pointer;
             border: none;
             border-radius: 10px;
             background-color: #ffde6b;
-            color: #4a2323;
-            font-family: 'Bangers', cursive;
+            color: #222;
+            font-weight: bold;
             text-transform: uppercase;
             box-shadow: 0 5px 0 #ccb056;
             transition: all 0.1s ease;
@@ -108,33 +104,20 @@
             box-shadow: 0 2px 0 #ccb056;
             transform: translateY(3px);
         }
-
-        @media (max-width: 600px) {
-            h1 {
-                font-size: 2.5rem;
-            }
-            .info-bar {
-                font-size: 1.2rem;
-            }
-            .message-box {
-                padding: 20px;
-            }
-            .message-box h2 {
-                font-size: 2.5rem;
-            }
-            .btn {
-                font-size: 1.2rem;
-            }
-        }
     </style>
 </head>
 <body>
     <div class="game-container">
-        <h1>EVADE</h1>
-        <canvas id="gameCanvas"></canvas>
+        <h1>PADDLE CLASH</h1>
         <div class="info-bar">
-            <span>Score: <span id="score">0</span></span>
-            <span>Health: <span id="health">100</span></span>
+            <span>Player: <span id="playerScore">0</span></span>
+            <span>AI: <span id="aiScore">0</span></span>
+        </div>
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+        <div class="info-bar" style="justify-content: center;">
+            <button id="togglePaddleBtn" class="btn">Toggle Paddle Type</button>
+            <span style="margin-left: 20px;">Your Paddle: <span id="paddleType">Standard</span></span>
+            <span style="margin-left: 20px;">AI Paddle: <span id="aiPaddleType">Standard</span></span>
         </div>
     </div>
 
@@ -148,127 +131,227 @@
         document.addEventListener('DOMContentLoaded', () => {
             const canvas = document.getElementById('gameCanvas');
             const ctx = canvas.getContext('2d');
-            const scoreDisplay = document.getElementById('score');
-            const healthDisplay = document.getElementById('health');
+            const playerScoreDisplay = document.getElementById('playerScore');
+            const aiScoreDisplay = document.getElementById('aiScore');
+            const paddleTypeDisplay = document.getElementById('paddleType');
+            const aiPaddleTypeDisplay = document.getElementById('aiPaddleType');
             const messageBox = document.getElementById('messageBox');
             const messageTitle = document.getElementById('messageTitle');
             const messageText = document.getElementById('messageText');
             const playAgainBtn = document.getElementById('playAgainBtn');
+            const togglePaddleBtn = document.getElementById('togglePaddleBtn');
 
+            const PADDLE_WIDTH = 10;
+            const BALL_RADIUS = 7;
+            const MIN_PADDLE_HEIGHT = 20;
+            const MAX_BALL_SPEED = 10;
+
+            // Define different paddle types
+            const paddleTypes = [
+                { name: 'Standard', height: 80, speed: 5 },
+                { name: 'Wide', height: 120, speed: 4 },
+                { name: 'Fast', height: 60, speed: 7 },
+                { name: 'Shrinking', height: 80, speed: 6 },
+                { name: 'Bouncy', height: 80, speed: 5, special: 'bouncy' },
+                { name: 'Sticky', height: 80, speed: 2, special: 'sticky' }
+            ];
+            let currentPlayerPaddleIndex = 0;
+            let currentAIPaddleIndex = 0;
+
+            let playerScore;
+            let aiScore;
+            let playerPaddle;
+            let aiPaddle;
+            let ball;
+            let isGameOver;
             let gameInterval;
-            let player;
-            let enemies = [];
-            let projectiles = [];
-            let score = 0;
-            let health = 100;
-            let isGameOver = false;
-            let enemySpawnRate = 1000;
-            let lastEnemySpawn = 0;
-            
-            // Player movement keys
-            const keys = {
-                up: false,
-                down: false,
-                left: false,
-                right: false
-            };
+            let isBallStuck = false;
 
-            const canvasSize = Math.min(window.innerWidth, window.innerHeight, 500);
-            canvas.width = canvasSize;
-            canvas.height = canvasSize;
-            
-            // Resize canvas on window resize
-            window.addEventListener('resize', () => {
-                const newSize = Math.min(window.innerWidth, window.innerHeight, 500);
-                canvas.width = newSize;
-                canvas.height = newSize;
-            });
-
-            class Character {
-                constructor(x, y, radius, color) {
-                    this.x = x;
-                    this.y = y;
-                    this.radius = radius;
-                    this.color = color;
-                    this.speed = 2;
-                }
-
-                draw() {
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-                    ctx.fillStyle = this.color;
-                    ctx.fill();
-                    ctx.closePath();
-                }
+            function createPaddles() {
+                const playerType = paddleTypes[currentPlayerPaddleIndex];
+                const aiType = paddleTypes[currentAIPaddleIndex];
+                
+                playerPaddle = {
+                    x: 20,
+                    y: (canvas.height - playerType.height) / 2,
+                    width: PADDLE_WIDTH,
+                    height: playerType.height,
+                    speed: playerType.speed,
+                    dy: 0,
+                    type: playerType.name,
+                    special: playerType.special
+                };
+                aiPaddle = {
+                    x: canvas.width - 20 - PADDLE_WIDTH,
+                    y: (canvas.height - aiType.height) / 2,
+                    width: PADDLE_WIDTH,
+                    height: aiType.height,
+                    speed: aiType.speed,
+                    dy: 0,
+                    type: aiType.name,
+                    special: aiType.special
+                };
             }
 
-            class Player extends Character {
-                constructor(x, y, radius, color) {
-                    super(x, y, radius, color);
-                    this.health = 100;
-                }
-
-                update() {
-                    if (keys.up) this.y -= this.speed;
-                    if (keys.down) this.y += this.speed;
-                    if (keys.left) this.x -= this.speed;
-                    if (keys.right) this.x += this.speed;
-
-                    // Keep player within canvas boundaries
-                    if (this.x - this.radius < 0) this.x = this.radius;
-                    if (this.x + this.radius > canvas.width) this.x = canvas.width - this.radius;
-                    if (this.y - this.radius < 0) this.y = this.radius;
-                    if (this.y + this.radius > canvas.height) this.y = canvas.height - this.radius;
-                }
-
-                takeDamage() {
-                    this.health -= 10;
-                    healthDisplay.textContent = this.health;
-                    if (this.health <= 0) {
-                        isGameOver = true;
-                        endGame('Game Over', `Your score: ${score}`);
-                    }
-                }
-            }
-
-            class Projectile extends Character {
-                constructor(x, y, radius, color, velocity) {
-                    super(x, y, radius, color);
-                    this.velocity = velocity;
-                }
-
-                update() {
-                    this.x += this.velocity.x;
-                    this.y += this.velocity.y;
-                }
-            }
-
-            class Enemy extends Character {
-                constructor(x, y, radius, color) {
-                    super(x, y, radius, color);
-                }
-
-                update() {
-                    const angle = Math.atan2(player.y - this.y, player.x - this.x);
-                    this.x += Math.cos(angle) * this.speed;
-                    this.y += Math.sin(angle) * this.speed;
-                }
+            function createBall() {
+                ball = {
+                    x: canvas.width / 2,
+                    y: canvas.height / 2,
+                    radius: BALL_RADIUS,
+                    dx: 5 * (Math.random() > 0.5 ? 1 : -1),
+                    dy: 5 * (Math.random() > 0.5 ? 1 : -1)
+                };
+                isBallStuck = false;
             }
 
             function startGame() {
-                player = new Player(canvas.width / 2, canvas.height / 2, 15, '#ffde6b');
-                enemies = [];
-                projectiles = [];
-                score = 0;
-                health = 100;
+                playerScore = 0;
+                aiScore = 0;
                 isGameOver = false;
-                lastEnemySpawn = Date.now();
-                scoreDisplay.textContent = score;
-                healthDisplay.textContent = health;
+                
+                playerScoreDisplay.textContent = playerScore;
+                aiScoreDisplay.textContent = aiScore;
                 messageBox.style.display = 'none';
 
+                // Reset to standard paddles at the start
+                currentPlayerPaddleIndex = 0;
+                currentAIPaddleIndex = 0;
+                
+                createPaddles();
+                createBall();
+
+                paddleTypeDisplay.textContent = playerPaddle.type;
+                aiPaddleTypeDisplay.textContent = aiPaddle.type;
+                
                 if (gameInterval) clearInterval(gameInterval);
-                gameInterval = setInterval(gameLoop, 1000 / 60); // 60 FPS
+                gameInterval = setInterval(gameLoop, 1000 / 60);
+            }
+
+            function draw() {
+                // Clear canvas
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw paddles
+                if (playerPaddle.special === 'sticky') {
+                    ctx.fillStyle = '#32cd32';
+                } else if (playerPaddle.special === 'bouncy') {
+                    ctx.fillStyle = '#ff4500';
+                } else {
+                    ctx.fillStyle = '#fff';
+                }
+                ctx.fillRect(playerPaddle.x, playerPaddle.y, playerPaddle.width, playerPaddle.height);
+                
+                if (aiPaddle.special === 'sticky') {
+                    ctx.fillStyle = '#32cd32';
+                } else if (aiPaddle.special === 'bouncy') {
+                    ctx.fillStyle = '#ff4500';
+                } else {
+                    ctx.fillStyle = '#fff';
+                }
+                ctx.fillRect(aiPaddle.x, aiPaddle.y, aiPaddle.width, aiPaddle.height);
+
+                // Draw ball
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffde6b';
+                ctx.fill();
+                ctx.closePath();
+
+                // Draw center line
+                ctx.strokeStyle = '#555';
+                ctx.beginPath();
+                ctx.moveTo(canvas.width / 2, 0);
+                ctx.lineTo(canvas.width / 2, canvas.height);
+                ctx.stroke();
+            }
+
+            function update() {
+                // Shrinking paddle logic
+                if (playerPaddle.type === 'Shrinking' && playerPaddle.height > MIN_PADDLE_HEIGHT) {
+                    playerPaddle.height -= 0.05;
+                }
+                if (aiPaddle.type === 'Shrinking' && aiPaddle.height > MIN_PADDLE_HEIGHT) {
+                    aiPaddle.height -= 0.05;
+                }
+
+                // Move player paddle
+                playerPaddle.y += playerPaddle.dy;
+                if (playerPaddle.y < 0) playerPaddle.y = 0;
+                if (playerPaddle.y + playerPaddle.height > canvas.height) playerPaddle.y = canvas.height - playerPaddle.height;
+
+                // AI logic: The AI now moves with its current paddle's speed
+                if (ball.y < aiPaddle.y + aiPaddle.height / 2) {
+                    aiPaddle.y -= aiPaddle.speed;
+                } else {
+                    aiPaddle.y += aiPaddle.speed;
+                }
+                if (aiPaddle.y < 0) aiPaddle.y = 0;
+                if (aiPaddle.y + aiPaddle.height > canvas.height) aiPaddle.y = canvas.height - aiPaddle.height;
+
+                // If ball is stuck, it follows the paddle
+                if (isBallStuck) {
+                    ball.x = playerPaddle.x + playerPaddle.width + ball.radius;
+                    ball.y = playerPaddle.y + playerPaddle.height / 2;
+                } else {
+                    // Move ball
+                    ball.x += ball.dx;
+                    ball.y += ball.dy;
+                }
+
+                // Ball collision with top/bottom walls
+                if (ball.y - ball.radius < 0 || ball.y + ball.radius > canvas.height) {
+                    ball.dy *= -1;
+                }
+
+                // Ball collision with player paddle
+                if (ball.x - ball.radius < playerPaddle.x + playerPaddle.width &&
+                    ball.y > playerPaddle.y && ball.y < playerPaddle.y + playerPaddle.height) {
+                    
+                    if (playerPaddle.special === 'bouncy') {
+                        ball.dx *= -1.2;
+                        if (Math.abs(ball.dx) > MAX_BALL_SPEED) ball.dx = Math.sign(ball.dx) * MAX_BALL_SPEED;
+                    } else if (playerPaddle.special === 'sticky') {
+                        isBallStuck = true;
+                        ball.dx = 0;
+                        ball.dy = 0;
+                        setTimeout(() => {
+                            isBallStuck = false;
+                            ball.dx = 5;
+                            ball.dy = 5 * (Math.random() > 0.5 ? 1 : -1);
+                        }, 750); // Ball sticks for 0.75 seconds
+                    } else {
+                        ball.dx *= -1;
+                    }
+                    ball.x = playerPaddle.x + playerPaddle.width + ball.radius;
+                }
+
+                // Ball collision with AI paddle
+                if (ball.x + ball.radius > aiPaddle.x &&
+                    ball.y > aiPaddle.y && ball.y < aiPaddle.y + aiPaddle.height) {
+                    ball.dx *= -1;
+                    ball.x = aiPaddle.x - ball.radius; // Prevent ball from getting stuck
+                }
+
+                // Check for score
+                if (ball.x < 0) {
+                    aiScore++;
+                    aiScoreDisplay.textContent = aiScore;
+                    changeAIPaddleType(); // AI changes type on your score
+                    createBall();
+                    if (aiScore >= 10) endGame('Game Over', 'The AI won!');
+                } else if (ball.x > canvas.width) {
+                    playerScore++;
+                    playerScoreDisplay.textContent = playerScore;
+                    createBall();
+                    if (playerScore >= 10) endGame('You Won!', 'You beat the AI!');
+                }
+            }
+
+            function gameLoop() {
+                if (isGameOver) return;
+                update();
+                draw();
             }
 
             function endGame(title, text) {
@@ -279,132 +362,52 @@
                 messageBox.style.display = 'flex';
             }
 
-            function spawnEnemy() {
-                if (Date.now() - lastEnemySpawn > enemySpawnRate) {
-                    let x, y;
-                    const side = Math.floor(Math.random() * 4);
-                    switch(side) {
-                        case 0: // Top
-                            x = Math.random() * canvas.width;
-                            y = -30;
-                            break;
-                        case 1: // Right
-                            x = canvas.width + 30;
-                            y = Math.random() * canvas.height;
-                            break;
-                        case 2: // Bottom
-                            x = Math.random() * canvas.width;
-                            y = canvas.height + 30;
-                            break;
-                        case 3: // Left
-                            x = -30;
-                            y = Math.random() * canvas.height;
-                            break;
-                    }
-                    enemies.push(new Enemy(x, y, 10, '#f65e3b'));
-                    lastEnemySpawn = Date.now();
-                    // Increase difficulty over time
-                    if (enemySpawnRate > 200) enemySpawnRate -= 5;
-                }
-            }
-            
-            function gameLoop() {
+            // Keyboard controls for player
+            document.addEventListener('keydown', e => {
                 if (isGameOver) return;
+                const currentType = paddleTypes[currentPlayerPaddleIndex];
+                switch (e.key) {
+                    case 'w': playerPaddle.dy = -currentType.speed; break;
+                    case 's': playerPaddle.dy = currentType.speed; break;
+                }
+            });
+
+            document.addEventListener('keyup', e => {
+                switch (e.key) {
+                    case 'w': 
+                    case 's': playerPaddle.dy = 0; break;
+                }
+            });
+
+            function changeAIPaddleType() {
+                currentAIPaddleIndex = Math.floor(Math.random() * paddleTypes.length);
+                const newType = paddleTypes[currentAIPaddleIndex];
                 
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                aiPaddle.height = newType.height;
+                aiPaddle.speed = newType.speed;
+                aiPaddle.special = newType.special;
+                aiPaddleTypeDisplay.textContent = newType.name;
 
-                spawnEnemy();
-
-                player.update();
-                player.draw();
-
-                // Update and draw projectiles
-                projectiles.forEach((p, index) => {
-                    p.update();
-                    p.draw();
-                    if (p.x < -p.radius || p.x > canvas.width + p.radius || p.y < -p.radius || p.y > canvas.height + p.radius) {
-                        projectiles.splice(index, 1);
-                    }
-                });
-
-                // Update and draw enemies
-                enemies.forEach((e, enemyIndex) => {
-                    e.update();
-                    e.draw();
-
-                    // Collision with player
-                    const dist = Math.hypot(e.x - player.x, e.y - player.y);
-                    if (dist - e.radius - player.radius < 1) {
-                        player.takeDamage();
-                        enemies.splice(enemyIndex, 1);
-                    }
-
-                    // Collision with projectiles
-                    projectiles.forEach((p, pIndex) => {
-                        const hitDist = Math.hypot(e.x - p.x, e.y - p.y);
-                        if (hitDist - e.radius - p.radius < 1) {
-                            enemies.splice(enemyIndex, 1);
-                            projectiles.splice(pIndex, 1);
-                            score += 10;
-                            scoreDisplay.textContent = score;
-                        }
-                    });
-                });
+                // Center the paddle after changing size
+                aiPaddle.y = (canvas.height - aiPaddle.height) / 2;
             }
 
-            // Keyboard controls
-            window.addEventListener('keydown', (e) => {
-                if (isGameOver) return;
-                switch(e.key) {
-                    case 'w': keys.up = true; break;
-                    case 's': keys.down = true; break;
-                    case 'a': keys.left = true; break;
-                    case 'd': keys.right = true; break;
-                    case ' ': shoot(); break;
-                }
+            // Toggle player paddle type
+            togglePaddleBtn.addEventListener('click', () => {
+                currentPlayerPaddleIndex = (currentPlayerPaddleIndex + 1) % paddleTypes.length;
+                const newType = paddleTypes[currentPlayerPaddleIndex];
+                
+                playerPaddle.height = newType.height;
+                playerPaddle.speed = newType.speed;
+                playerPaddle.special = newType.special;
+                paddleTypeDisplay.textContent = newType.name;
+
+                // Center the paddle after changing size
+                playerPaddle.y = (canvas.height - playerPaddle.height) / 2;
             });
 
-            window.addEventListener('keyup', (e) => {
-                switch(e.key) {
-                    case 'w': keys.up = false; break;
-                    case 's': keys.down = false; break;
-                    case 'a': keys.left = false; break;
-                    case 'd': keys.right = false; break;
-                }
-            });
-
-            // Mouse/Touch shooting
-            canvas.addEventListener('mousedown', (e) => {
-                if (isGameOver) return;
-                const rect = canvas.getBoundingClientRect();
-                const mouseX = e.clientX - rect.left;
-                const mouseY = e.clientY - rect.top;
-                shoot(mouseX, mouseY);
-            });
-            
-            canvas.addEventListener('touchstart', (e) => {
-                if (isGameOver) return;
-                e.preventDefault();
-                const rect = canvas.getBoundingClientRect();
-                const touchX = e.touches[0].clientX - rect.left;
-                const touchY = e.touches[0].clientY - rect.top;
-                shoot(touchX, touchY);
-            });
-
-            function shoot(targetX, targetY) {
-                if (!player) return; // Guard against shooting before player exists
-                const angle = Math.atan2(targetY - player.y, targetX - player.x);
-                const velocity = {
-                    x: Math.cos(angle) * 5,
-                    y: Math.sin(angle) * 5
-                };
-                projectiles.push(new Projectile(player.x, player.y, 5, '#ffde6b', velocity));
-            }
-
-            // Button listener
             playAgainBtn.addEventListener('click', startGame);
 
-            // Start the game for the first time
             startGame();
         });
     </script>
