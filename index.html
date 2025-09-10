@@ -5,269 +5,310 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Shooting Game with AI Bots</title>
 <style>
-  body {
-    margin: 0; background: #222; color: white; overflow: hidden;
-    font-family: monospace;
-    user-select: none;
+  body, html {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #111;
+    font-family: Arial, sans-serif;
   }
   canvas {
-    background: #111;
+    background: #222;
     display: block;
     margin: 0 auto;
-    border: 2px solid #555;
   }
-  #ui {
-    position: absolute;
-    top: 5px; left: 5px;
-    font-size: 16px;
+  #healthBar {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    height: 20px;
+    background: #555;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  #healthFill {
+    height: 100%;
+    background: limegreen;
+    width: 100%;
+    transition: width 0.3s ease;
+  }
+  #gameOver {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #f55;
+    font-size: 48px;
+    display: none;
   }
 </style>
 </head>
 <body>
-<div id="ui">Health: <span id="health">100</span></div>
-<canvas id="game" width="800" height="600"></canvas>
+
+<div id="healthBar">
+  <div id="healthFill"></div>
+</div>
+<div id="gameOver">GAME OVER</div>
+
+<canvas id="gameCanvas" width="800" height="600"></canvas>
 
 <script>
 (() => {
-  const canvas = document.getElementById('game');
+  const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
-  const healthDisplay = document.getElementById('health');
 
-  const WIDTH = canvas.width;
-  const HEIGHT = canvas.height;
+  const width = canvas.width;
+  const height = canvas.height;
 
-  // Player properties
+  // Player setup
   const player = {
-    x: WIDTH/2,
-    y: HEIGHT/2,
+    x: width/2,
+    y: height/2,
     size: 20,
-    speed: 4,
-    color: 'lightblue',
+    speed: 3.5,
+    color: 'cyan',
     health: 100,
     cooldown: 0,
+    bullets: []
   };
 
-  // Bullets (both player and bots)
-  let bullets = [];
+  // Controls
+  const keys = {};
 
-  // AI bots
-  const bots = [];
-  const BOT_COUNT = 5;
+  // Bullets common setup
+  const bulletSpeed = 7;
+  const bulletSize = 6;
 
-  function randRange(min, max) {
-    return Math.random() * (max - min) + min;
+  // Bots setup
+  class Bot {
+    constructor(x, y) {
+      this.x = x;
+      this.y = y;
+      this.size = 20;
+      this.color = 'orange';
+      this.health = 30;
+      this.speed = 1.5;
+      this.bullets = [];
+      this.cooldown = 0;
+    }
+
+    moveTowards(targetX, targetY) {
+      const dx = targetX - this.x;
+      const dy = targetY - this.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 0) {
+        this.x += (dx / dist) * this.speed;
+        this.y += (dy / dist) * this.speed;
+      }
+    }
+
+    shootAt(targetX, targetY) {
+      if (this.cooldown <= 0) {
+        const angle = Math.atan2(targetY - this.y, targetX - this.x);
+        this.bullets.push({
+          x: this.x,
+          y: this.y,
+          dx: Math.cos(angle) * bulletSpeed,
+          dy: Math.sin(angle) * bulletSpeed,
+          size: bulletSize,
+          color: 'red'
+        });
+        this.cooldown = 60; // cooldown frames
+      }
+    }
+
+    update() {
+      this.cooldown--;
+      if (this.cooldown < 0) this.cooldown = 0;
+
+      // Move toward player
+      this.moveTowards(player.x, player.y);
+
+      // Shoot player if in range
+      const dist = Math.hypot(player.x - this.x, player.y - this.y);
+      if (dist < 400) this.shootAt(player.x, player.y);
+
+      // Update bullets
+      this.bullets = this.bullets.filter(bullet => {
+        bullet.x += bullet.dx;
+        bullet.y += bullet.dy;
+        // Check if bullet hits player
+        if (
+          bullet.x > player.x - player.size / 2 &&
+          bullet.x < player.x + player.size / 2 &&
+          bullet.y > player.y - player.size / 2 &&
+          bullet.y < player.y + player.size / 2
+        ) {
+          player.health -= 10;
+          updateHealthBar();
+          return false; // remove bullet
+        }
+        // Remove bullet if out of bounds
+        return bullet.x >= 0 && bullet.x <= width && bullet.y >= 0 && bullet.y <= height;
+      });
+    }
+
+    draw() {
+      // Bot body
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw bullets
+      this.bullets.forEach(bullet => {
+        ctx.fillStyle = bullet.color;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, bullet.size / 2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
   }
 
-  // Create bots
-  for(let i=0; i<BOT_COUNT; i++){
-    bots.push({
-      x: randRange(50, WIDTH-50),
-      y: randRange(50, HEIGHT-50),
-      size: 20,
-      speed: 2,
-      color: 'red',
-      health: 30,
-      direction: Math.random() * 2 * Math.PI,
-      cooldown: 0,
+  const bots = [];
+  const maxBots = 5;
+
+  // Spawn bots at random edges
+  function spawnBot() {
+    let x, y;
+    const edge = Math.floor(Math.random() * 4);
+    switch (edge) {
+      case 0: x = 0; y = Math.random() * height; break;
+      case 1: x = width; y = Math.random() * height; break;
+      case 2: x = Math.random() * width; y = 0; break;
+      case 3: x = Math.random() * width; y = height; break;
+    }
+    bots.push(new Bot(x, y));
+  }
+
+  // Player shooting
+  function playerShoot(targetX, targetY) {
+    if (player.cooldown <= 0) {
+      const angle = Math.atan2(targetY - player.y, targetX - player.x);
+      player.bullets.push({
+        x: player.x,
+        y: player.y,
+        dx: Math.cos(angle) * bulletSpeed,
+        dy: Math.sin(angle) * bulletSpeed,
+        size: bulletSize,
+        color: 'lime'
+      });
+      player.cooldown = 15;
+    }
+  }
+
+  // Player movement update
+  function updatePlayer() {
+    if (keys['w'] || keys['ArrowUp']) player.y -= player.speed;
+    if (keys['s'] || keys['ArrowDown']) player.y += player.speed;
+    if (keys['a'] || keys['ArrowLeft']) player.x -= player.speed;
+    if (keys['d'] || keys['ArrowRight']) player.x += player.speed;
+
+    // Keep player inside canvas
+    player.x = Math.max(player.size/2, Math.min(width - player.size/2, player.x));
+    player.y = Math.max(player.size/2, Math.min(height - player.size/2, player.y));
+
+    player.cooldown--;
+    if (player.cooldown < 0) player.cooldown = 0;
+
+    // Update player bullets
+    player.bullets = player.bullets.filter(bullet => {
+      bullet.x += bullet.dx;
+      bullet.y += bullet.dy;
+
+      // Check collision with bots
+      for (let i = 0; i < bots.length; i++) {
+        const bot = bots[i];
+        const dist = Math.hypot(bullet.x - bot.x, bullet.y - bot.y);
+        if (dist < bot.size / 2) {
+          bot.health -= 10;
+          if (bot.health <= 0) bots.splice(i, 1);
+          return false; // remove bullet
+        }
+      }
+
+      // Remove bullet if out of bounds
+      return bullet.x >= 0 && bullet.x <= width && bullet.y >= 0 && bullet.y <= height;
     });
   }
 
-  // Input tracking
-  const keys = {};
-  window.addEventListener('keydown', e => {
+  // Drawing functions
+  function drawPlayer() {
+    ctx.fillStyle = player.color;
+    ctx.beginPath();
+    ctx.arc(player.x, player.y, player.size / 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw player bullets
+    player.bullets.forEach(bullet => {
+      ctx.fillStyle = bullet.color;
+      ctx.beginPath();
+      ctx.arc(bullet.x, bullet.y, bullet.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  // Health bar update
+  function updateHealthBar() {
+    const healthFill = document.getElementById('healthFill');
+    healthFill.style.width = Math.max(0, player.health) + '%';
+  }
+
+  // Game over display
+  function gameOver() {
+    document.getElementById('gameOver').style.display = 'block';
+  }
+
+  // Main game loop
+  function gameLoop() {
+    ctx.clearRect(0, 0, width, height);
+
+    if (player.health <= 0) {
+      gameOver();
+      return;
+    }
+
+    // Spawn bots over time if less than max
+    if (bots.length < maxBots && Math.random() < 0.01) {
+      spawnBot();
+    }
+
+    updatePlayer();
+
+    bots.forEach(bot => {
+      bot.update();
+      bot.draw();
+    });
+
+    drawPlayer();
+
+    requestAnimationFrame(gameLoop);
+  }
+
+  // Input handlers
+  window.addEventListener('keydown', (e) => {
     keys[e.key.toLowerCase()] = true;
   });
-  window.addEventListener('keyup', e => {
+
+  window.addEventListener('keyup', (e) => {
     keys[e.key.toLowerCase()] = false;
   });
 
-  // Helper: distance between two points
-  function dist(x1,y1,x2,y2){
-    return Math.hypot(x2 - x1, y2 - y1);
-  }
-
-  // Shoot bullet function
-  function shootBullet(x, y, dx, dy, owner){
-    bullets.push({x, y, dx, dy, speed: 8, size: 5, owner});
-  }
-
-  // Game update function
-  function update(){
-    // Player movement
-    let dx = 0, dy = 0;
-    if(keys['w'] || keys['arrowup']) dy -= 1;
-    if(keys['s'] || keys['arrowdown']) dy += 1;
-    if(keys['a'] || keys['arrowleft']) dx -= 1;
-    if(keys['d'] || keys['arrowright']) dx += 1;
-
-    if(dx !== 0 || dy !== 0){
-      const length = Math.hypot(dx, dy);
-      dx /= length;
-      dy /= length;
-
-      player.x += dx * player.speed;
-      player.y += dy * player.speed;
-
-      // Keep inside bounds
-      player.x = Math.min(WIDTH - player.size/2, Math.max(player.size/2, player.x));
-      player.y = Math.min(HEIGHT - player.size/2, Math.max(player.size/2, player.y));
-    }
-
-    // Shooting: spacebar to shoot
-    if(keys[' ']){
-      if(player.cooldown <= 0){
-        // Shoot bullet upwards (or you could shoot in movement direction)
-        // I'll shoot towards mouse pointer for more fun
-        if(lastMousePos){
-          let angle = Math.atan2(lastMousePos.y - player.y, lastMousePos.x - player.x);
-          let dx = Math.cos(angle);
-          let dy = Math.sin(angle);
-          shootBullet(player.x + dx*player.size, player.y + dy*player.size, dx, dy, 'player');
-          player.cooldown = 15; // cooldown frames (~0.25s)
-        }
-      }
-    }
-    if(player.cooldown > 0) player.cooldown--;
-
-    // Update bullets
-    bullets = bullets.filter(bullet => {
-      bullet.x += bullet.dx * bullet.speed;
-      bullet.y += bullet.dy * bullet.speed;
-      // Remove if off screen
-      return bullet.x > 0 && bullet.x < WIDTH && bullet.y > 0 && bullet.y < HEIGHT;
-    });
-
-    // Bots AI: simple behavior - random walk + shoot if close to player
-    bots.forEach(bot => {
-      if(bot.health <= 0) return;
-
-      // Move bot in its current direction
-      bot.x += Math.cos(bot.direction) * bot.speed;
-      bot.y += Math.sin(bot.direction) * bot.speed;
-
-      // Bounce from edges
-      if(bot.x < bot.size/2 || bot.x > WIDTH - bot.size/2){
-        bot.direction = Math.PI - bot.direction;
-      }
-      if(bot.y < bot.size/2 || bot.y > HEIGHT - bot.size/2){
-        bot.direction = -bot.direction;
-      }
-
-      // Slight random turn
-      bot.direction += (Math.random() - 0.5) * 0.1;
-
-      // Shoot if player is close and cooldown ready
-      const distToPlayer = dist(bot.x, bot.y, player.x, player.y);
-      if(distToPlayer < 200 && bot.cooldown <= 0){
-        // Shoot towards player
-        let angle = Math.atan2(player.y - bot.y, player.x - bot.x);
-        let dx = Math.cos(angle);
-        let dy = Math.sin(angle);
-        shootBullet(bot.x + dx*bot.size, bot.y + dy*bot.size, dx, dy, 'bot');
-        bot.cooldown = 60; // slower shooting for bots
-      }
-      if(bot.cooldown > 0) bot.cooldown--;
-    });
-
-    // Bullet collisions
-    bullets.forEach((bullet, i) => {
-      if(bullet.owner === 'player'){
-        // Check bots hit
-        bots.forEach(bot => {
-          if(bot.health > 0 && dist(bullet.x, bullet.y, bot.x, bot.y) < bot.size/2 + bullet.size/2){
-            bot.health -= 10;
-            bullets.splice(i, 1);
-          }
-        });
-      } else if(bullet.owner === 'bot'){
-        // Check player hit
-        if(dist(bullet.x, bullet.y, player.x, player.y) < player.size/2 + bullet.size/2){
-          player.health -= 10;
-          bullets.splice(i, 1);
-        }
-      }
-    });
-
-    // Update UI
-    healthDisplay.textContent = player.health;
-
-    // Check game over
-    if(player.health <= 0){
-      alert('Game Over! Reload page to play again.');
-      player.health = 100;
-      // reset bots
-      bots.forEach(bot => {
-        bot.health = 30;
-        bot.x = randRange(50, WIDTH-50);
-        bot.y = randRange(50, HEIGHT-50);
-      });
-      bullets = [];
-      player.x = WIDTH/2;
-      player.y = HEIGHT/2;
-    }
-  }
-
-  // Drawing function
-  function draw(){
-    ctx.clearRect(0, 0, WIDTH, HEIGHT);
-
-    // Draw player
-    ctx.fillStyle = player.color;
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.size/2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Draw bots
-    bots.forEach(bot => {
-      if(bot.health <= 0) return; // dead bots not shown
-      ctx.fillStyle = bot.color;
-      ctx.beginPath();
-      ctx.arc(bot.x, bot.y, bot.size/2, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Draw health bar for bot
-      ctx.fillStyle = 'black';
-      ctx.fillRect(bot.x - bot.size/2, bot.y - bot.size, bot.size, 5);
-      ctx.fillStyle = 'lime';
-      ctx.fillRect(bot.x - bot.size/2, bot.y - bot.size, bot.size * (bot.health / 30), 5);
-    });
-
-    // Draw bullets
-    ctx.fillStyle = 'yellow';
-    bullets.forEach(bullet => {
-      ctx.beginPath();
-      ctx.arc(bullet.x, bullet.y, bullet.size/2, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    // Draw player health bar top-left
-    ctx.fillStyle = 'black';
-    ctx.fillRect(10, HEIGHT - 30, 100, 20);
-    ctx.fillStyle = 'lime';
-    ctx.fillRect(10, HEIGHT - 30, player.health, 20);
-    ctx.strokeStyle = 'white';
-    ctx.strokeRect(10, HEIGHT - 30, 100, 20);
-  }
-
-  // Track mouse for aiming
-  let lastMousePos = null;
-  canvas.addEventListener('mousemove', e => {
+  canvas.addEventListener('click', (e) => {
     const rect = canvas.getBoundingClientRect();
-    lastMousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    playerShoot(mouseX, mouseY);
   });
 
-  // Game loop
-  function loop(){
-    update();
-    draw();
-    requestAnimationFrame(loop);
-  }
-
-  loop();
+  updateHealthBar();
+  gameLoop();
 })();
 </script>
+
 </body>
 </html>
+
 
 
 
