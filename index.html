@@ -3,117 +3,109 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Top-down Shooting Game</title>
+  <title>Racing Game</title>
   <style>
-    * { box-sizing: border-box; }
-    body { margin: 0; font-family: system-ui, sans-serif; background: #0b0f1a; color: #f2f2f2; text-align: center; }
-    #ui { padding: 12px; background: linear-gradient(90deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)); }
-    #game { display: block; margin: 12px auto; background: #1a2238; border: 4px solid #2d3a5c; box-shadow: 0 8px 30px rgba(0,0,0,0.7); }
-    #status, #info { margin-top: 6px; font-size: 14px; }
-    #retryBtn { display: none; margin: 10px auto; padding: 10px 20px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; background: #e63946; color: #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.5); transition: 0.2s; }
-    #retryBtn:hover { background: #d62828; }
+    body { margin:0; background:#111; color:#eee; font-family:sans-serif; text-align:center; }
+    #ui { padding:10px; }
+    #game { display:block; margin:0 auto; background:#333; border:4px solid #555; }
+    #retryBtn { display:none; margin-top:10px; padding:10px 20px; font-size:16px; background:#e63946; color:#fff; border:none; border-radius:6px; cursor:pointer; }
+    #retryBtn:hover { background:#d62828; }
   </style>
 </head>
 <body>
   <div id="ui">
-    <h1>Top-down Shooting Game</h1>
-    <div id="info">Move: WASD • Shoot: Click/Space • Weapon: 1/2/3 • Map: M</div>
-    <div id="status">HP: <span id="hp">100</span> • Weapon: <span id="wlevel">1</span> • Map: <span id="map">1</span></div>
-    <button id="retryBtn">Retry</button>
+    <h1>🏁 Racing Game</h1>
+    <div id="status">Lap: <span id="lap">1</span> / 3</div>
+    <button id="retryBtn">Restart</button>
   </div>
-  <canvas id="game" width="960" height="640"></canvas>
+  <canvas id="game" width="800" height="600"></canvas>
 
   <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-    const hpEl = document.getElementById('hp');
-    const wlevelEl = document.getElementById('wlevel');
-    const mapEl = document.getElementById('map');
-    const retryBtn = document.getElementById('retryBtn');
+    const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
+    const retryBtn=document.getElementById("retryBtn"),lapEl=document.getElementById("lap");
+    const W=canvas.width,H=canvas.height;
 
-    const W = canvas.width, H = canvas.height;
-    const keys = {}; let mouse = { x: W/2, y: H/2, down: false };
+    const player={x:W/2,y:H-80,w:30,h:50,speed:0,angle:0,laps:1,finished:false};
+    const enemies=[{x:W/2-100,y:H-120,w:30,h:50,speed:2,lap:1,finished:false},
+                   {x:W/2+100,y:H-160,w:30,h:50,speed:2.2,lap:1,finished:false}];
 
-    const player = { x: W/2, y: H/2, r: 14, speed: 240, hp: 100, fireCooldown: 0, fireRate: 0.18, wlevel: 1 };
-    let bullets = [], enemyBullets = [], enemies = [];
+    let track={finishY:50,totalLaps:3};
+    let keys={},gameOver=false;
 
-    const maps = [
-      { name: 'Arena', bg: '#0b132b', spawns: [[80,80],[880,80],[80,560],[880,560],[480,80]] },
-      { name: 'Center Maze', bg: '#1c2541', spawns: [[240,160],[720,160],[240,480],[720,480],[480,320]] }
-    ];
-    let mapIndex = 0;
-
-    let last = performance.now(); let gameOver = false;
-
-    function spawnEnemies() {
-      enemies = [];
-      const sp = maps[mapIndex].spawns;
-      for (let [x,y] of sp) enemies.push({ x, y, r: 16, hp: 20, speed: 60, shootTimer: Math.random()*2, shootRate: 1.2 });
+    function reset(){
+      player.x=W/2;player.y=H-80;player.speed=0;player.angle=0;player.laps=1;player.finished=false;
+      enemies[0].x=W/2-100;enemies[0].y=H-120;enemies[0].lap=1;enemies[0].finished=false;
+      enemies[1].x=W/2+100;enemies[1].y=H-160;enemies[1].lap=1;enemies[1].finished=false;
+      lapEl.textContent=1;gameOver=false;retryBtn.style.display="none";
     }
 
-    function reset() {
-      player.x = W/2; player.y = H/2; player.hp = 100; player.wlevel = 1; player.fireCooldown = 0;
-      bullets = []; enemyBullets = []; enemies = [];
-      mapIndex = 0; mapEl.textContent = mapIndex+1; wlevelEl.textContent = player.wlevel; hpEl.textContent = player.hp;
-      gameOver = false; retryBtn.style.display = 'none';
-      spawnEnemies();
-    }
+    function update(dt){
+      if(gameOver) return;
+      // Player controls
+      if(keys["arrowup"]||keys["w"]) player.speed+=0.1;
+      if(keys["arrowdown"]||keys["s"]) player.speed-=0.1;
+      player.speed*=0.98; // friction
+      if(keys["arrowleft"]||keys["a"]) player.angle-=0.05;
+      if(keys["arrowright"]||keys["d"]) player.angle+=0.05;
 
-    function playerShoot() {
-      if (player.fireCooldown > 0) return;
-      const angle = Math.atan2(mouse.y - player.y, mouse.x - player.x);
-      const speed = 420;
-      if (player.wlevel === 1) bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, dmg: 5 });
-      else if (player.wlevel === 2) for (let a of [angle-0.18, angle, angle+0.18]) bullets.push({ x: player.x, y: player.y, vx: Math.cos(a)*speed, vy: Math.sin(a)*speed, dmg: 4 });
-      else bullets.push({ x: player.x, y: player.y, vx: Math.cos(angle)*speed*1.4, vy: Math.sin(angle)*speed*1.4, dmg: 9 });
-      player.fireCooldown = player.fireRate;
-    }
+      player.x+=Math.sin(player.angle)*player.speed;
+      player.y-=Math.cos(player.angle)*player.speed;
 
-    function enemyShoot(e) {
-      const angle = Math.atan2(player.y - e.y, player.x - e.x);
-      enemyBullets.push({ x: e.x, y: e.y, vx: Math.cos(angle)*200, vy: Math.sin(angle)*200, dmg: 7 });
-    }
+      // Keep inside track
+      player.x=Math.max(50,Math.min(W-50,player.x));
+      player.y=Math.max(track.finishY,Math.min(H-50,player.y));
 
-    function update(dt) {
-      if (gameOver) return;
-      let vx=0, vy=0; if(keys['w']||keys['arrowup'])vy-=1;if(keys['s']||keys['arrowdown'])vy+=1;if(keys['a']||keys['arrowleft'])vx-=1;if(keys['d']||keys['arrowright'])vx+=1;
-      const len=Math.hypot(vx,vy)||1; player.x+=vx/len*player.speed*dt; player.y+=vy/len*player.speed*dt;
-      player.x=Math.max(player.r,Math.min(W-player.r,player.x)); player.y=Math.max(player.r,Math.min(H-player.r,player.y));
-      if(mouse.down) playerShoot(); if(player.fireCooldown>0) player.fireCooldown-=dt;
-
-      for(let b of bullets){b.x+=b.vx*dt;b.y+=b.vy*dt;}
-      for(let b of enemyBullets){b.x+=b.vx*dt;b.y+=b.vy*dt;if(Math.hypot(b.x-player.x,b.y-player.y)<player.r){player.hp-=b.dmg;b.dead=true;hpEl.textContent=player.hp;if(player.hp<=0){gameOver=true;retryBtn.style.display='block';}}}
-
-      for(let e of enemies){
-        const dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy); e.x+=dx/d*e.speed*dt; e.y+=dy/d*e.speed*dt;
-        e.shootTimer-=dt; if(e.shootTimer<=0){enemyShoot(e); e.shootTimer=e.shootRate;}
+      // Lap check
+      if(player.y<=track.finishY && !player.finished){
+        player.laps++;lapEl.textContent=player.laps;
+        if(player.laps>track.totalLaps){player.finished=true;gameOver=true;retryBtn.style.display="block";}
       }
 
-      for(let b of bullets){for(let e of enemies){if(Math.hypot(b.x-e.x,b.y-e.y)<e.r){e.hp-=b.dmg;b.dead=true;if(e.hp<=0)e.dead=true;}}}
-
-      enemies=enemies.filter(e=>!e.dead); bullets=bullets.filter(b=>!b.dead); enemyBullets=enemyBullets.filter(b=>!b.dead);
+      // Enemy AI
+      for(let e of enemies){
+        if(!e.finished){
+          e.y-=e.speed;
+          if(e.y<=track.finishY){e.lap++; if(e.lap>track.totalLaps){e.finished=true;gameOver=true;retryBtn.style.display="block";}}
+          if(e.y<0) e.y=H; // loop around
+        }
+      }
     }
 
     function draw(){
-      ctx.fillStyle=maps[mapIndex].bg; ctx.fillRect(0,0,W,H);
-      ctx.fillStyle='#4cc9f0'; ctx.beginPath(); ctx.arc(player.x,player.y,player.r,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle='#f72585'; for(let e of enemies){ctx.beginPath();ctx.arc(e.x,e.y,e.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(e.hp, e.x-6,e.y-20);ctx.fillStyle='#f72585';}
-      ctx.fillStyle='#90e0ef'; for(let b of bullets){ctx.fillRect(b.x-2,b.y-2,4,4);}
-      ctx.fillStyle='#ffb703'; for(let b of enemyBullets){ctx.fillRect(b.x-2,b.y-2,4,4);}
-      if(gameOver){ctx.fillStyle='rgba(0,0,0,0.6)';ctx.fillRect(0,0,W,H);ctx.fillStyle='#fff';ctx.font='40px sans-serif';ctx.fillText('Game Over',W/2-100,H/2);}
+      ctx.fillStyle="#222";ctx.fillRect(0,0,W,H);
+      // Track edges
+      ctx.fillStyle="#555";ctx.fillRect(40,0,10,H);ctx.fillRect(W-50,0,10,H);
+      ctx.fillStyle="#ff0";ctx.fillRect(50,track.finishY-5,W-100,10);
+
+      // Player
+      ctx.save();ctx.translate(player.x,player.y);ctx.rotate(player.angle);
+      ctx.fillStyle="#4cc9f0";ctx.fillRect(-player.w/2,-player.h/2,player.w,player.h);
+      ctx.restore();
+
+      // Enemies
+      for(let e of enemies){
+        ctx.fillStyle="#f72585";ctx.fillRect(e.x-e.w/2,e.y-e.h/2,e.w,e.h);
+      }
+
+      if(gameOver){
+        ctx.fillStyle="rgba(0,0,0,0.5)";ctx.fillRect(0,0,W,H);
+        ctx.fillStyle="#fff";ctx.font="40px sans-serif";
+        ctx.fillText(player.finished?\"You Win!\":\"You Lose!\",W/2-80,H/2);
+      }
     }
 
-    function loop(ts){const dt=(ts-last)/1000;last=ts;update(dt);draw();requestAnimationFrame(loop);} reset(); requestAnimationFrame(loop);
+    let last=performance.now();
+    function loop(ts){let dt=(ts-last)/16;last=ts;update(dt);draw();requestAnimationFrame(loop);}
+    loop();
 
-    window.addEventListener('keydown',e=>{keys[e.key.toLowerCase()]=true;if(['1','2','3'].includes(e.key)){player.wlevel=Number(e.key);wlevelEl.textContent=player.wlevel;}if(e.key.toLowerCase()==='m'){mapIndex=(mapIndex+1)%maps.length;mapEl.textContent=mapIndex+1;spawnEnemies();}});
-    window.addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
-    canvas.addEventListener('mousemove',e=>{const r=canvas.getBoundingClientRect();mouse.x=(e.clientX-r.left)*(canvas.width/r.width);mouse.y=(e.clientY-r.top)*(canvas.height/r.height);});
-    canvas.addEventListener('mousedown',()=>mouse.down=true); window.addEventListener('mouseup',()=>mouse.down=false);
-
-    retryBtn.addEventListener('click', reset);
+    window.addEventListener(\"keydown\",e=>keys[e.key.toLowerCase()]=true);
+    window.addEventListener(\"keyup\",e=>keys[e.key.toLowerCase()]=false);
+    retryBtn.addEventListener(\"click\",reset);
+    reset();
   </script>
 </body>
 </html>
+
 
 
 
