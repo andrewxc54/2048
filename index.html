@@ -2,12 +2,131 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Racing Game</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Simple Platformer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+
+    canvas {
+      display: block;
+      margin: auto;
+      background-color: #222;
+    }
+  </style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="800" height="600"></canvas>
-  <script src="game.js"></script>
+  <canvas id="gameCanvas" width="800" height="400"></canvas>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Game settings
+    const gravity = 0.5;
+    const friction = 0.8;
+
+    // Player object
+    const player = {
+      x: 50,
+      y: 0,
+      width: 30,
+      height: 30,
+      velocityX: 0,
+      velocityY: 0,
+      speed: 4,
+      jumping: true,
+      color: "lime"
+    };
+
+    // Key press tracking
+    const keys = {};
+
+    // Platforms
+    const platforms = [
+      { x: 0, y: 380, width: 800, height: 20 },     // ground
+      { x: 150, y: 300, width: 120, height: 10 },
+      { x: 350, y: 250, width: 100, height: 10 },
+      { x: 550, y: 200, width: 100, height: 10 }
+    ];
+
+    // Key events
+    document.addEventListener("keydown", e => keys[e.code] = true);
+    document.addEventListener("keyup", e => keys[e.code] = false);
+
+    function update() {
+      // Movement controls
+      if (keys["ArrowLeft"]) {
+        player.velocityX = -player.speed;
+      } else if (keys["ArrowRight"]) {
+        player.velocityX = player.speed;
+      } else {
+        player.velocityX *= friction;
+      }
+
+      // Jump
+      if (keys["ArrowUp"] && !player.jumping) {
+        player.velocityY = -10;
+        player.jumping = true;
+      }
+
+      // Apply gravity
+      player.velocityY += gravity;
+
+      // Update position
+      player.x += player.velocityX;
+      player.y += player.velocityY;
+
+      // Collision with platforms
+      platforms.forEach(p => {
+        if (
+          player.x < p.x + p.width &&
+          player.x + player.width > p.x &&
+          player.y < p.y + p.height &&
+          player.y + player.height > p.y
+        ) {
+          // Collision detected
+          player.y = p.y - player.height;
+          player.velocityY = 0;
+          player.jumping = false;
+        }
+      });
+
+      // Boundaries
+      if (player.x < 0) player.x = 0;
+      if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+      if (player.y > canvas.height) {
+        player.y = 0;
+        player.velocityY = 0;
+      }
+    }
+
+    function draw() {
+      // Clear screen
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw player
+      ctx.fillStyle = player.color;
+      ctx.fillRect(player.x, player.y, player.width, player.height);
+
+      // Draw platforms
+      ctx.fillStyle = "#444";
+      platforms.forEach(p => {
+        ctx.fillRect(p.x, p.y, p.width, p.height);
+      });
+    }
+
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Start the game
+    gameLoop();
+  </script>
 </body>
 </html>
+
 
