@@ -2,61 +2,77 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Simple Platformer</title>
+  <title>Platformer Game</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-    }
-
-    canvas {
-      display: block;
-      margin: auto;
-      background-color: #222;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #111; color: white; text-align: center; font-family: sans-serif; }
+    canvas { display: block; margin: 20px auto; background-color: #222; border: 2px solid #555; }
+    h1 { margin-top: 10px; }
   </style>
 </head>
 <body>
+  <h1>🕹️ Platformer Game</h1>
+  <p>Use Arrow Keys to Move and Jump. Collect all coins!</p>
+  <p>💰 Score: <span id="score">0</span> / <span id="total">0</span></p>
   <canvas id="gameCanvas" width="800" height="400"></canvas>
 
   <script>
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
+    const scoreDisplay = document.getElementById('score');
+    const totalDisplay = document.getElementById('total');
 
     // Game settings
     const gravity = 0.5;
     const friction = 0.8;
 
-    // Player object
     const player = {
-      x: 50,
-      y: 0,
-      width: 30,
-      height: 30,
-      velocityX: 0,
-      velocityY: 0,
-      speed: 4,
-      jumping: true,
-      color: "lime"
+      x: 50, y: 0, width: 30, height: 30,
+      velocityX: 0, velocityY: 0,
+      speed: 4, jumping: true, color: "#00FF7F"
     };
 
-    // Key press tracking
     const keys = {};
 
-    // Platforms
     const platforms = [
-      { x: 0, y: 380, width: 800, height: 20 },     // ground
+      { x: 0, y: 380, width: 800, height: 20 },    // ground
       { x: 150, y: 300, width: 120, height: 10 },
       { x: 350, y: 250, width: 100, height: 10 },
-      { x: 550, y: 200, width: 100, height: 10 }
+      { x: 550, y: 200, width: 100, height: 10 },
+      { x: 700, y: 150, width: 80, height: 10 }
     ];
 
-    // Key events
+    const coins = [
+      { x: 180, y: 270, radius: 8, collected: false },
+      { x: 380, y: 220, radius: 8, collected: false },
+      { x: 580, y: 170, radius: 8, collected: false },
+      { x: 720, y: 120, radius: 8, collected: false }
+    ];
+
+    let score = 0;
+    totalDisplay.textContent = coins.length;
+
     document.addEventListener("keydown", e => keys[e.code] = true);
     document.addEventListener("keyup", e => keys[e.code] = false);
 
+    function resetPlayer() {
+      player.x = 50;
+      player.y = 0;
+      player.velocityX = 0;
+      player.velocityY = 0;
+    }
+
+    function checkCollision(a, b) {
+      return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y
+      );
+    }
+
     function update() {
-      // Movement controls
+      // Controls
       if (keys["ArrowLeft"]) {
         player.velocityX = -player.speed;
       } else if (keys["ArrowRight"]) {
@@ -65,7 +81,6 @@
         player.velocityX *= friction;
       }
 
-      // Jump
       if (keys["ArrowUp"] && !player.jumping) {
         player.velocityY = -10;
         player.jumping = true;
@@ -78,32 +93,53 @@
       player.x += player.velocityX;
       player.y += player.velocityY;
 
-      // Collision with platforms
+      // Platform collision
+      player.jumping = true;
       platforms.forEach(p => {
-        if (
-          player.x < p.x + p.width &&
-          player.x + player.width > p.x &&
-          player.y < p.y + p.height &&
-          player.y + player.height > p.y
-        ) {
-          // Collision detected
-          player.y = p.y - player.height;
-          player.velocityY = 0;
-          player.jumping = false;
+        if (checkCollision(player, p)) {
+          if (player.velocityY >= 0) {
+            player.y = p.y - player.height;
+            player.velocityY = 0;
+            player.jumping = false;
+          }
         }
       });
 
-      // Boundaries
+      // Coin collection
+      coins.forEach(c => {
+        if (!c.collected) {
+          const dx = player.x + player.width / 2 - c.x;
+          const dy = player.y + player.height / 2 - c.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance < player.width / 2 + c.radius) {
+            c.collected = true;
+            score++;
+            scoreDisplay.textContent = score;
+          }
+        }
+      });
+
+      // Check win
+      if (score === coins.length) {
+        alert("🎉 You collected all the coins!");
+        location.reload(); // Restart game
+      }
+
+      // Out of bounds (fell off)
+      if (player.y > canvas.height) {
+        alert("💀 You fell! Try again.");
+        resetPlayer();
+        score = 0;
+        coins.forEach(c => c.collected = false);
+        scoreDisplay.textContent = score;
+      }
+
+      // Wall boundaries
       if (player.x < 0) player.x = 0;
       if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
-      if (player.y > canvas.height) {
-        player.y = 0;
-        player.velocityY = 0;
-      }
     }
 
     function draw() {
-      // Clear screen
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // Draw player
@@ -111,9 +147,22 @@
       ctx.fillRect(player.x, player.y, player.width, player.height);
 
       // Draw platforms
-      ctx.fillStyle = "#444";
+      ctx.fillStyle = "#666";
       platforms.forEach(p => {
         ctx.fillRect(p.x, p.y, p.width, p.height);
+      });
+
+      // Draw coins
+      coins.forEach(c => {
+        if (!c.collected) {
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+          ctx.fillStyle = "gold";
+          ctx.fill();
+          ctx.strokeStyle = "#FFD700";
+          ctx.stroke();
+          ctx.closePath();
+        }
       });
     }
 
@@ -123,7 +172,6 @@
       requestAnimationFrame(gameLoop);
     }
 
-    // Start the game
     gameLoop();
   </script>
 </body>
