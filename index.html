@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Platformer Game</title>
+  <meta charset="UTF-8" />
+  <title>Platformer with Enemy AI</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: #111; color: white; text-align: center; font-family: sans-serif; }
@@ -11,8 +11,9 @@
   </style>
 </head>
 <body>
-  <h1>🕹️ Platformer Game</h1>
-  <p>Use Arrow Keys to Move and Jump. Collect all coins!</p>
+  <h1>🕹️ Platformer Game with Enemy AI</h1>
+  <p>Use Arrow Keys to Move and Jump. Collect all coins to progress! Avoid enemies!</p>
+  <p>Level: <span id="levelDisplay">1</span></p>
   <p>💰 Score: <span id="score">0</span> / <span id="total">0</span></p>
   <canvas id="gameCanvas" width="800" height="400"></canvas>
 
@@ -21,45 +22,109 @@
     const ctx = canvas.getContext('2d');
     const scoreDisplay = document.getElementById('score');
     const totalDisplay = document.getElementById('total');
+    const levelDisplay = document.getElementById('levelDisplay');
 
-    // Game settings
     const gravity = 0.5;
     const friction = 0.8;
 
     const player = {
-      x: 50, y: 0, width: 30, height: 30,
-      velocityX: 0, velocityY: 0,
-      speed: 4, jumping: true, color: "#00FF7F"
+      x: 50,
+      y: 0,
+      width: 30,
+      height: 30,
+      velocityX: 0,
+      velocityY: 0,
+      speed: 4,
+      jumping: true,
+      color: "#00FF7F"
     };
 
     const keys = {};
 
-    const platforms = [
-      { x: 0, y: 380, width: 800, height: 20 },    // ground
-      { x: 150, y: 300, width: 120, height: 10 },
-      { x: 350, y: 250, width: 100, height: 10 },
-      { x: 550, y: 200, width: 100, height: 10 },
-      { x: 700, y: 150, width: 80, height: 10 }
+    // Levels: Each has platforms, coins, and enemies
+    const levels = [
+      {
+        platforms: [
+          { x: 0, y: 380, width: 800, height: 20 },
+          { x: 150, y: 300, width: 120, height: 10 },
+          { x: 350, y: 250, width: 100, height: 10 },
+          { x: 550, y: 200, width: 100, height: 10 },
+          { x: 700, y: 150, width: 80, height: 10 }
+        ],
+        coins: [
+          { x: 180, y: 270, radius: 8, collected: false },
+          { x: 380, y: 220, radius: 8, collected: false },
+          { x: 580, y: 170, radius: 8, collected: false },
+          { x: 720, y: 120, radius: 8, collected: false }
+        ],
+        enemies: [
+          { x: 160, y: 270, width: 30, height: 20, velocityX: 2, rangeStart: 150, rangeEnd: 270, color: "red" }
+        ]
+      },
+      {
+        platforms: [
+          { x: 0, y: 380, width: 800, height: 20 },
+          { x: 100, y: 320, width: 150, height: 10 },
+          { x: 300, y: 270, width: 80, height: 10 },
+          { x: 450, y: 230, width: 120, height: 10 },
+          { x: 630, y: 180, width: 100, height: 10 },
+          { x: 750, y: 130, width: 40, height: 10 }
+        ],
+        coins: [
+          { x: 140, y: 290, radius: 8, collected: false },
+          { x: 340, y: 240, radius: 8, collected: false },
+          { x: 490, y: 200, radius: 8, collected: false },
+          { x: 670, y: 150, radius: 8, collected: false },
+          { x: 770, y: 100, radius: 8, collected: false }
+        ],
+        enemies: [
+          { x: 110, y: 300, width: 30, height: 20, velocityX: 2.5, rangeStart: 100, rangeEnd: 230, color: "red" },
+          { x: 460, y: 210, width: 30, height: 20, velocityX: 3, rangeStart: 450, rangeEnd: 570, color: "red" }
+        ]
+      },
+      {
+        platforms: [
+          { x: 0, y: 380, width: 800, height: 20 },
+          { x: 180, y: 340, width: 80, height: 10 },
+          { x: 300, y: 300, width: 100, height: 10 },
+          { x: 450, y: 260, width: 150, height: 10 },
+          { x: 650, y: 210, width: 100, height: 10 },
+          { x: 760, y: 160, width: 30, height: 10 }
+        ],
+        coins: [
+          { x: 210, y: 310, radius: 8, collected: false },
+          { x: 340, y: 270, radius: 8, collected: false },
+          { x: 520, y: 230, radius: 8, collected: false },
+          { x: 680, y: 180, radius: 8, collected: false },
+          { x: 780, y: 130, radius: 8, collected: false }
+        ],
+        enemies: [
+          { x: 190, y: 320, width: 30, height: 20, velocityX: 2, rangeStart: 180, rangeEnd: 250, color: "red" },
+          { x: 460, y: 240, width: 30, height: 20, velocityX: 3, rangeStart: 450, rangeEnd: 590, color: "red" }
+        ]
+      }
     ];
 
-    const coins = [
-      { x: 180, y: 270, radius: 8, collected: false },
-      { x: 380, y: 220, radius: 8, collected: false },
-      { x: 580, y: 170, radius: 8, collected: false },
-      { x: 720, y: 120, radius: 8, collected: false }
-    ];
-
+    let currentLevel = 0;
     let score = 0;
-    totalDisplay.textContent = coins.length;
-
-    document.addEventListener("keydown", e => keys[e.code] = true);
-    document.addEventListener("keyup", e => keys[e.code] = false);
 
     function resetPlayer() {
       player.x = 50;
       player.y = 0;
       player.velocityX = 0;
       player.velocityY = 0;
+      player.jumping = true;
+    }
+
+    function loadLevel(levelIndex) {
+      currentLevel = levelIndex;
+      const level = levels[levelIndex];
+      level.coins.forEach(c => c.collected = false);
+      score = 0;
+      scoreDisplay.textContent = score;
+      totalDisplay.textContent = level.coins.length;
+      levelDisplay.textContent = levelIndex + 1;
+      resetPlayer();
     }
 
     function checkCollision(a, b) {
@@ -71,8 +136,11 @@
       );
     }
 
+    document.addEventListener("keydown", e => keys[e.code] = true);
+    document.addEventListener("keyup", e => keys[e.code] = false);
+
     function update() {
-      // Controls
+      // Player controls
       if (keys["ArrowLeft"]) {
         player.velocityX = -player.speed;
       } else if (keys["ArrowRight"]) {
@@ -86,16 +154,16 @@
         player.jumping = true;
       }
 
-      // Apply gravity
+      // Gravity
       player.velocityY += gravity;
 
-      // Update position
+      // Update player position
       player.x += player.velocityX;
       player.y += player.velocityY;
 
-      // Platform collision
+      // Platform collisions
       player.jumping = true;
-      platforms.forEach(p => {
+      levels[currentLevel].platforms.forEach(p => {
         if (checkCollision(player, p)) {
           if (player.velocityY >= 0) {
             player.y = p.y - player.height;
@@ -106,12 +174,12 @@
       });
 
       // Coin collection
-      coins.forEach(c => {
+      levels[currentLevel].coins.forEach(c => {
         if (!c.collected) {
           const dx = player.x + player.width / 2 - c.x;
           const dy = player.y + player.height / 2 - c.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          if (distance < player.width / 2 + c.radius) {
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < player.width / 2 + c.radius) {
             c.collected = true;
             score++;
             scoreDisplay.textContent = score;
@@ -119,22 +187,44 @@
         }
       });
 
-      // Check win
-      if (score === coins.length) {
-        alert("🎉 You collected all the coins!");
-        location.reload(); // Restart game
+      // Enemy movement and collision
+      levels[currentLevel].enemies.forEach(enemy => {
+        // Move enemy
+        enemy.x += enemy.velocityX;
+
+        // Reverse direction if out of patrol range
+        if (enemy.x < enemy.rangeStart || enemy.x + enemy.width > enemy.rangeEnd) {
+          enemy.velocityX *= -1;
+          // Clamp position to range
+          if (enemy.x < enemy.rangeStart) enemy.x = enemy.rangeStart;
+          if (enemy.x + enemy.width > enemy.rangeEnd) enemy.x = enemy.rangeEnd - enemy.width;
+        }
+
+        // Check collision with player
+        if (checkCollision(player, enemy)) {
+          alert("💥 You got caught by an enemy! Restarting level...");
+          loadLevel(currentLevel);
+        }
+      });
+
+      // Check if all coins collected
+      if (score === levels[currentLevel].coins.length) {
+        if (currentLevel + 1 < levels.length) {
+          alert("Level Complete! Moving to next level...");
+          loadLevel(currentLevel + 1);
+        } else {
+          alert("🎉 Congratulations! You completed all levels!");
+          loadLevel(0);
+        }
       }
 
-      // Out of bounds (fell off)
+      // Fell off screen
       if (player.y > canvas.height) {
-        alert("💀 You fell! Try again.");
-        resetPlayer();
-        score = 0;
-        coins.forEach(c => c.collected = false);
-        scoreDisplay.textContent = score;
+        alert("You fell! Restarting level...");
+        loadLevel(currentLevel);
       }
 
-      // Wall boundaries
+      // Boundaries
       if (player.x < 0) player.x = 0;
       if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
     }
@@ -148,12 +238,12 @@
 
       // Draw platforms
       ctx.fillStyle = "#666";
-      platforms.forEach(p => {
+      levels[currentLevel].platforms.forEach(p => {
         ctx.fillRect(p.x, p.y, p.width, p.height);
       });
 
       // Draw coins
-      coins.forEach(c => {
+      levels[currentLevel].coins.forEach(c => {
         if (!c.collected) {
           ctx.beginPath();
           ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
@@ -164,6 +254,12 @@
           ctx.closePath();
         }
       });
+
+      // Draw enemies
+      levels[currentLevel].enemies.forEach(enemy => {
+        ctx.fillStyle = enemy.color;
+        ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+      });
     }
 
     function gameLoop() {
@@ -172,9 +268,11 @@
       requestAnimationFrame(gameLoop);
     }
 
+    loadLevel(0);
     gameLoop();
   </script>
 </body>
 </html>
+
 
 
